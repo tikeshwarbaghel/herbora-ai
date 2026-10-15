@@ -1,0 +1,621 @@
+# HERBORA AI — COMPLETE UI POLISH, VISUAL REDESIGN & ACCOUNT SYSTEM
+
+Act as a senior product designer, design systems engineer, frontend architect, and accessibility specialist.
+
+The existing HERBORA AI frontend is already implemented and working. Your task is to upgrade the EXISTING application into a polished, visually striking, premium, production-quality herbal intelligence platform.
+
+Do not start a new project. Do not replace the application with a landing page. First inspect the existing codebase, routes, components, styles, assets, dependencies, and functionality. Then improve the existing implementation in place.
+
+The current problems are:
+
+* Colours look faded, washed out, or too pale.
+* Body text and descriptions are too small and low-contrast.
+* Cards and sections lack visual depth and hierarchy.
+* The interface does not yet feel like a finished premium product.
+* Login, signup, profile, and account settings need to be integrated.
+* The entire application needs a consistent final visual treatment.
+
+Your goal is to make the application feel like a polished botanical AI product that could be presented confidently in a college project demonstration or product portfolio.
+
+## 1. PRESERVE EXISTING FUNCTIONALITY
+
+Before editing:
+
+1. Inspect every existing page and route.
+2. Identify existing functional components, upload flows, search, herb profiles, recommendation logic, and demo/backend services.
+3. Preserve working functionality.
+4. Reuse existing dependencies when possible.
+5. Avoid unnecessary package installations.
+6. Do not remove existing pages or working features.
+7. Do not overwrite real model integrations with mock data.
+8. Do not break existing TypeScript types or API contracts.
+
+Make visual changes systematically, preferably through shared design tokens and reusable components.
+
+## 2. NEW VISUAL DIRECTION
+
+Transform HERBORA AI into a premium botanical intelligence platform with a rich, editorial, modern scientific identity.
+
+The design should combine:
+
+* Luxury botanical editorial styling.
+* Professional health-tech software.
+* Modern AI product usability.
+* Credible scientific information architecture.
+* Warm, natural, vivid colours.
+
+It must not look like a generic template, a basic college assignment, or a washed-out pastel dashboard.
+
+### Use this colour system
+
+Primary forest green: #123D2B
+Deep forest green: #0B2B20
+Rich emerald: #16834A
+Bright botanical green: #2DAA63
+Sage accent: #A9C7A4
+Warm ivory: #FAF8F1
+Pale green surface: #EFF5EC
+White: #FFFFFF
+Primary text: #18251D
+Secondary text: #4B5B50
+Muted text: #657368
+Border: #D7E2D5
+Terracotta accent: #B96342
+Success: #237A45
+Warning: #9A5A12
+Error: #B42318
+
+Use these colours with intention:
+
+* Deep green for primary navigation, hero backgrounds, primary buttons, and strong branded sections.
+* Bright emerald for active states, interactive accents, and highlights.
+* Warm ivory for the main application background.
+* White for content surfaces and cards.
+* Dark green-black for headings.
+* Dark, readable secondary text for descriptions.
+* Terracotta sparingly for warm botanical contrast.
+
+Avoid making every section green. Balance strong branded sections with bright, calm reading surfaces.
+
+### Typography overhaul
+
+Use a refined serif for major editorial headings, such as DM Serif Display or Playfair Display.
+
+Use Inter or Manrope for interface text.
+
+Set a consistent responsive type scale:
+
+* Hero headline: approximately 48–64px on desktop, 36–44px on mobile.
+* Page title: 36–44px on desktop, 28–34px on mobile.
+* Section headings: 26–32px.
+* Card titles: 20–24px.
+* Body and descriptive text: 16–18px.
+* Supporting content: 15–16px.
+* Labels and metadata: normally 13–14px, with sufficient contrast.
+
+Never use tiny body copy to fit more content into a card.
+
+Body text must use comfortable line-height around 1.55–1.75. Use suitable max-widths for paragraphs. Important descriptions must be readable without zooming.
+
+Do not make essential information pale grey. Secondary text should still have strong contrast against its background.
+
+## 3. GLOBAL DESIGN SYSTEM
+
+Create or improve shared design tokens for:
+
+* Colours.
+* Typography.
+* Spacing.
+* Border radii.
+* Shadows.
+* Focus rings.
+* Component heights.
+* Responsive breakpoints.
+
+Upgrade:
+
+* Primary and secondary buttons.
+* Text fields.
+* Search inputs.
+* Dropdowns.
+* Filter controls.
+* Tabs.
+* Badges.
+* Cards.
+* Modals.
+* Toasts.
+* Empty states.
+* Loading states.
+* Error messages.
+* Pagination.
+* Tooltips.
+* Breadcrumbs.
+
+Use consistent radii around 12–20px and restrained shadows.
+
+Buttons must have clear visual hierarchy:
+
+* Primary: deep or rich green with white text.
+* Secondary: white or ivory with dark text and a visible border.
+* Tertiary: text or subtle icon action.
+
+Add clear hover, active, disabled, and keyboard-focus states.
+
+Use subtle transitions around 150–250ms. Respect reduced-motion preferences.
+
+Avoid excessive gradients, excessive animations, oversized shadows, and unnecessary glassmorphism.
+
+## 4. APPLICATION SHELL AND NAVIGATION
+
+Refine the entire application shell.
+
+Desktop:
+
+* A polished sidebar with consistent spacing and clear active navigation.
+* Brand mark and HERBORA AI wordmark.
+* Descriptive navigation labels.
+* A visually obvious active route indicator.
+* A clear top header with breadcrumbs or page title.
+* Global search.
+* A functional notification icon only if a real notification interaction is implemented.
+* A profile avatar/menu on the right.
+* A compact footer where appropriate.
+
+Navigation:
+
+* Overview
+* Identify a Herb
+* Explore Herbs
+* Intelligent Search
+* Recommendations
+* Evidence & Safety
+* Saved Herbs, if implemented
+* About Project
+
+Account-related navigation:
+
+* My Profile
+* Settings
+* Sign In / Sign Out, depending on authentication state.
+
+Make active and hover states obvious without relying on colour alone.
+
+Mobile:
+
+* Responsive header.
+* Slide-out navigation or bottom navigation, depending on the existing layout.
+* Accessible touch targets.
+* Proper spacing around the mobile menu.
+* No horizontal overflow.
+* Keep essential actions easy to reach.
+
+## 5. OVERVIEW PAGE — MAKE IT FEEL COMPLETE
+
+Redesign the existing overview page without removing its current functionality.
+
+Create a strong visual hierarchy:
+
+1. Branded hero section.
+2. Clear heading and detailed but concise explanatory paragraph.
+3. Primary action to identify a herb.
+4. Secondary action to explore the herbal library.
+5. Strong botanical imagery.
+6. Four visually distinctive feature cards.
+7. Featured herbs.
+8. A well-designed "How it works" section.
+9. Research and safety information section.
+10. Professional footer.
+
+Hero headline:
+"Discover the intelligence within every leaf."
+
+Supporting description:
+"Explore medicinal plant identification, structured Ayurvedic herbal knowledge, related botanical properties, and research references through one intelligent platform."
+
+Make the hero more visually expressive:
+
+* Use a rich forest-green section or a balanced split layout.
+* Use high-quality botanical imagery.
+* Add a subtle botanical illustration or decorative shapes only if they improve the composition.
+* Use bright emerald highlights sparingly.
+* Ensure the heading and body copy have excellent contrast.
+* Make the primary CTA prominent.
+
+Feature cards should have:
+
+* Clear titles.
+* Descriptive text with meaningful detail.
+* Consistent icons.
+* Attractive hover states.
+* Working navigation.
+
+Avoid generic statistics and unsupported claims.
+
+## 6. IMPROVE ALL DESCRIPTIVE TEXT
+
+This requirement is critical.
+
+Audit every page and every component.
+
+Increase the readability of:
+
+* Hero descriptions.
+* Page introductions.
+* Feature descriptions.
+* Herb card summaries.
+* Herb profile sections.
+* Search explanations.
+* Recommendation explanations.
+* Evidence summaries.
+* Safety information.
+* Upload instructions.
+* Empty-state descriptions.
+* Error messages.
+* Form labels and helper text.
+
+Use meaningful descriptions, not vague filler.
+
+For example, replace:
+"Explore herbs."
+
+With:
+"Browse medicinal plants by common name, botanical name, plant family, and plant part. Open an individual profile to review available properties, traditional uses, related constituents, research references, and documented safety information."
+
+Replace:
+"Upload image."
+
+With:
+"Upload a clear photograph of a medicinal plant or leaf. The identification model will analyze the image and return a predicted match when the model service is available."
+
+Only claim that the model will analyze images when a real model is connected; otherwise show an explicit demo-mode explanation.
+
+Replace:
+"Recommendations."
+
+With:
+"Explore herbs with similar documented features. Recommendations are ranked using available structured data and do not imply that herbs have equivalent effects or are interchangeable."
+
+Descriptions should be specific, helpful, and honest.
+
+Do not make all text long. Maintain a useful hierarchy: clear headings, readable descriptions, concise labels, and detailed information where appropriate.
+
+## 7. HERB IDENTIFICATION PAGE
+
+Polish the existing identification workspace.
+
+Use a large, attractive upload card with:
+
+* Clear instructions.
+* Drag-and-drop upload area.
+* Strong upload icon.
+* Accepted formats.
+* File size information.
+* Image preview.
+* Replace/remove image controls.
+* A prominent primary Analyze button.
+* Accessible validation and error messages.
+* Loading animation with status text.
+* A polished results layout.
+
+Results should visually separate:
+
+* Predicted herb identity.
+* Botanical name.
+* Model confidence, only if returned by the actual model.
+* Alternative predictions.
+* Related knowledge.
+* Evidence and safety information.
+
+Make the prediction area visually prominent without making the confidence score look like a guarantee.
+
+If demo data is used, display a visible "Demo mode — real model not connected" label.
+
+Keep the existing upload functionality intact.
+
+## 8. HERB LIBRARY AND PROFILE PAGES
+
+Improve the visual treatment of every herb card.
+
+Use:
+
+* Larger, better-cropped botanical imagery.
+* Strong common-name typography.
+* Clearly styled italic botanical names.
+* Readable descriptions.
+* Attractive category tags.
+* Consistent card heights.
+* Visible profile actions.
+* Hover effects that do not shift the layout excessively.
+
+Add a strong page introduction above the grid.
+
+Improve filters and search inputs with visible labels, clear borders, and adequate height.
+
+For detailed herb profiles, create a rich editorial layout:
+
+* Hero image.
+* Common and botanical names.
+* Family and plant parts.
+* Overview.
+* Traditional uses.
+* Documented properties.
+* Reported constituents.
+* Formulations.
+* Evidence and sources.
+* Safety information.
+* Related herbs.
+
+Use section navigation or tabs for lengthy profiles. Keep all body text readable and provide source attribution for factual content.
+
+Never fabricate botanical or medicinal facts to fill empty sections.
+
+## 9. INTELLIGENT SEARCH AND RECOMMENDATIONS
+
+Make search feel like a professional research tool.
+
+Improve:
+
+* Search field size and visibility.
+* Search result hierarchy.
+* Result snippets.
+* Matching terms.
+* Botanical names.
+* Source links.
+* Loading states.
+* Empty results.
+* Clear search actions.
+
+For recommendations:
+
+* Make the selected herb obvious.
+* Show why a result matched.
+* Display similarity scores only when computed from actual data.
+* Make recommendation cards easy to scan.
+* Use concise explanatory labels.
+* Distinguish data similarity from medical suitability.
+
+Do not fabricate recommendation scores.
+
+## 10. EVIDENCE AND SAFETY
+
+Use a research-oriented layout with:
+
+* Clear section headings.
+* Source cards.
+* Publication title and year where available.
+* Evidence type.
+* Clickable source links.
+* Well-structured safety notices.
+* Clearly separated traditional knowledge and scientific research.
+* A visible educational-use disclaimer.
+
+Safety warnings should be prominent enough to notice but should not overwhelm the interface.
+
+Never use invented citations or claim clinical evidence without a verified source.
+
+## 11. ADD A COMPLETE AUTHENTICATION EXPERIENCE
+
+Add polished Sign In, Sign Up, and Forgot Password pages that match the existing visual identity.
+
+Suggested routes:
+
+* /login
+* /signup
+* /forgot-password
+
+Login page:
+
+* Brand logo and wordmark.
+* Heading: "Welcome back to HERBORA AI".
+* Supporting text: "Continue exploring botanical knowledge and your saved research."
+* Email field.
+* Password field with show/hide toggle.
+* Remember-me option only if implemented.
+* Forgot password link.
+* Primary Sign In button.
+* Link to Create Account.
+* Clear validation messages.
+* Loading and server-error states.
+* An attractive botanical image or branded visual panel on larger screens.
+
+Signup page:
+
+* Heading: "Create your HERBORA account".
+* Full name.
+* Email.
+* Password.
+* Confirm password.
+* Password visibility toggle.
+* Password strength feedback.
+* Terms/privacy consent checkbox.
+* Create Account button.
+* Link to Sign In.
+* Inline validation and clear errors.
+
+Forgot Password:
+
+* Email input.
+* Submit button.
+* Success confirmation that does not disclose whether an account exists.
+* Back to Sign In link.
+
+Important authentication requirements:
+
+* First inspect whether a real authentication service already exists.
+* If one exists, integrate with it using the existing supported patterns.
+* If not, build the frontend screens and an authentication service interface ready for secure backend integration.
+* Do not treat localStorage-based fake credentials as secure authentication.
+* Do not hardcode passwords, API keys, or secrets.
+* Do not claim that an account has been securely created or an email sent unless the backend confirms it.
+* If authentication is not connected, label the experience as a demo or show a clear not-configured state.
+* Protect account-only routes only when real authentication is configured.
+* Do not add social login buttons unless their functionality is actually implemented.
+
+## 12. ADD A USER PROFILE AND ACCOUNT MENU
+
+Add a profile avatar/dropdown in the top-right header.
+
+Menu items:
+
+* My Profile
+* Saved Herbs
+* Identification History
+* Settings
+* Sign Out
+
+Only show items as functional if they are implemented. If a feature is not yet available, clearly label it as coming soon instead of creating a fake action.
+
+Create route:
+/profile
+
+Profile page:
+
+* Avatar or initials.
+* Full name.
+* Email.
+* Edit Profile button.
+* Account information.
+* Joined date only if provided by the authentication service.
+* Saved herbs count only if backed by actual saved data.
+* Recent identification history only if real history data exists.
+* A clean two-column desktop layout that becomes a single column on mobile.
+
+Edit Profile:
+
+* Editable display name.
+* Avatar upload only if implemented safely.
+* Save and Cancel actions.
+* Validation.
+* Clear save success/error feedback.
+
+Do not collect unnecessary sensitive personal information.
+
+## 13. ADD SETTINGS
+
+Create route:
+/settings
+
+Use a well-designed settings layout with a side navigation or tabbed sections.
+
+Sections:
+
+1. Account
+2. Appearance
+3. Notifications
+4. Privacy
+5. Data and History
+
+Account:
+
+* Name and email display.
+* Change password only if supported by real authentication.
+* Account status where available.
+
+Appearance:
+
+* Light theme.
+* Dark theme only if fully implemented.
+* System preference if supported.
+
+Notifications:
+
+* Research updates preference.
+* Product announcements preference.
+* Make it clear whether email notifications are actually connected.
+
+Privacy:
+
+* Explain what data the frontend stores.
+* Show available privacy controls.
+* Do not imply that data is stored on a server if it is not.
+
+Data and History:
+
+* Clear saved searches/history if implemented.
+* Clear saved herbs if implemented.
+* Export data only if a real export function exists.
+* Confirmation dialogs for destructive actions.
+
+Preferences can be saved locally for non-sensitive UI settings. Authentication tokens and credentials must not be stored insecurely.
+
+## 14. SAVED HERBS AND IDENTIFICATION HISTORY
+
+If the existing application supports these features, polish them.
+
+Otherwise, add lightweight working implementations only where they fit the current data architecture.
+
+Saved Herbs:
+
+* Bookmark control on herb cards and profiles.
+* Saved Herbs page or profile section.
+* Empty state with an action to explore the library.
+* Remove saved herb action.
+* Consistent state across pages.
+
+Identification History:
+
+* Record entries only after a prediction service returns a result.
+* Show herb name, thumbnail, timestamp, and result status.
+* Do not create fake identification records.
+* Provide a clear history-empty state.
+
+Use a proper user-scoped backend when available. For demo mode, clearly disclose that saved items or history may be stored only in the current browser.
+
+## 15. FINISHING DETAILS
+
+Add:
+
+* Custom branded favicon if possible.
+* Consistent page titles.
+* Polished loading skeletons.
+* Attractive empty states.
+* Friendly error states.
+* Confirmation dialogs.
+* Accessible dropdown menus.
+* Focus indicators.
+* Smooth page transitions where appropriate.
+* Consistent icon sizing.
+* Better spacing between sections.
+* High-quality image fallbacks.
+* A refined footer.
+* Proper mobile navigation.
+
+Review every route, not just the homepage.
+
+No tiny body text.
+No washed-out descriptions.
+No broken buttons.
+No fake authentication.
+No fake AI results.
+No invented research claims.
+No broken image placeholders.
+No horizontal scrolling on mobile.
+
+## 16. TESTING AND FINAL QUALITY REVIEW
+
+After implementation:
+
+1. Run the application.
+2. Fix all build and TypeScript errors.
+3. Test every route.
+4. Test desktop, tablet, and mobile layouts.
+5. Test image upload and preview.
+6. Test search and filters.
+7. Test profile dropdown and settings navigation.
+8. Test login/signup validation and their actual integration state.
+9. Test saved items and history if implemented.
+10. Verify that all buttons have meaningful actions.
+11. Verify that body text has adequate size and contrast.
+12. Verify that the application maintains its botanical visual identity on every page.
+
+Make changes directly in the existing codebase.
+
+At the end, provide a concise implementation report identifying:
+
+* What was redesigned.
+* Which account features actually work.
+* Whether authentication is connected to a real backend.
+* Whether the ML prediction service is connected.
+* Any remaining configuration required.
+
+Start by inspecting the existing application, then implement the complete visual upgrade and account experience. Do not stop at recommendations or a plan.

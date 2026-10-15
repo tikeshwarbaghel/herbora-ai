@@ -1,14 +1,62 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ArrowDownWideNarrow, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, CircleAlert, FlaskConical, Grid2X2, ImagePlus, Info, Leaf, List, LoaderCircle, Menu, Search, ShieldCheck, Sprout, Upload, X } from "lucide-react";
-import { Link, Route, Switch, Router as WouterRouter, useLocation, useParams } from "wouter";
+import { ArrowDownWideNarrow, ArrowLeft, ArrowRight, Bookmark, BookOpen, Check, ChevronDown, CircleAlert, FlaskConical, Grid2X2, ImagePlus, Info, Leaf, List, LoaderCircle, Menu, Search, ShieldCheck, Sprout, Upload, UserRound, X } from "lucide-react";
+import { Link, Redirect, Route, Switch, Router as WouterRouter, useLocation, useParams } from "wouter";
+import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from "@clerk/react";
+import { publishableKeyFromHost } from "@clerk/react/internal";
+import { shadcn } from "@clerk/themes";
 import { herbs, type Herb } from "@/lib/herb-data";
 import { getEvidence, getHerbById, getHerbs, getRecommendations, getSafetyInformation, identifyHerb, searchHerbs } from "@/lib/herb-service";
+import { useSavedHerbs } from "@/lib/use-saved-herbs";
+import { AccountProfilePage, SavedHerbsPage, SettingsPage } from "@/AccountPages";
+import { HerbVisual } from "@/components/herb-visual";
 
 const queryClient = new QueryClient();
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+function stripBase(path: string): string { return basePath && path.startsWith(basePath) ? path.slice(basePath.length) || "/" : path; }
+if (!clerkPubKey) throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY in .env file");
+const clerkAppearance = {
+  theme: shadcn,
+  cssLayerName: "clerk",
+  options: { logoPlacement: "inside" as const, logoLinkUrl: basePath || "/", logoImageUrl: `${window.location.origin}${basePath}/logo.svg` },
+  variables: {
+    colorPrimary: "#16834A", colorForeground: "#18251D", colorMutedForeground: "#4B5B50",
+    colorDanger: "#B42318", colorBackground: "#FFFFFF", colorInput: "#FFFFFF",
+    colorInputForeground: "#18251D", colorNeutral: "#D7E2D5", fontFamily: "DM Sans, sans-serif", borderRadius: "0.75rem",
+  },
+  elements: {
+    rootBox: "w-full flex justify-center",
+    cardBox: "bg-white rounded-2xl w-[440px] max-w-full overflow-hidden",
+    card: "!shadow-none !border-0 !bg-transparent !rounded-none",
+    footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
+    headerTitle: "text-[#123D2B] font-semibold",
+    headerSubtitle: "text-[#4B5B50]",
+    socialButtonsBlockButtonText: "text-[#18251D]",
+    formFieldLabel: "text-[#18251D]",
+    footerActionLink: "text-[#16834A]",
+    footerActionText: "text-[#4B5B50]",
+    dividerText: "text-[#4B5B50]",
+    identityPreviewEditButton: "text-[#16834A]",
+    formFieldSuccessText: "text-[#237A45]",
+    alertText: "text-[#B42318]",
+    logoBox: "rounded-xl",
+    logoImage: "object-contain",
+    socialButtonsBlockButton: "border-[#D7E2D5] bg-white",
+    formButtonPrimary: "bg-[#16834A] hover:bg-[#123D2B] text-white",
+    formFieldInput: "border-[#D7E2D5] bg-white text-[#18251D]",
+    footerAction: "text-[#4B5B50]",
+    dividerLine: "bg-[#D7E2D5]",
+    alert: "border-[#B42318]",
+    otpCodeFieldInput: "border-[#D7E2D5] text-[#18251D]",
+    formFieldRow: "text-[#18251D]",
+    main: "text-[#18251D]",
+  },
+};
 const navItems = [
   { href: "/", label: "Overview", icon: Sprout },
   { href: "/identify", label: "Identify", icon: ImagePlus },
@@ -32,7 +80,10 @@ function PageMeta({ title, description }: { title: string; description: string }
 function Shell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { user } = useUser();
+  const { signOut } = useClerk();
   useEffect(() => setMenuOpen(false), [location]);
+  const accountActions = user ? <div className="account-nav"><Link href="/profile" className="account-nav-link"><UserRound size={16}/><span>My profile</span></Link><Link href="/saved-herbs" className="account-nav-link"><Bookmark size={16}/><span>Saved</span></Link><Link href="/settings" className="account-nav-link"><span>Settings</span></Link><button className="account-nav-link" type="button" onClick={() => void signOut({ redirectUrl: basePath || "/" })}>Sign out</button></div> : <Link href="/sign-in" className="account-signin">Sign in <ArrowRight size={14}/></Link>;
   return <div className="app-shell">
     <header className="topbar">
       <Link href="/" className="brand" aria-label="HERBORA AI overview"><span className="brand-mark"><Sprout size={22}/></span><span><b>HERBORA</b><small>FIELD NOTES · AI</small></span></Link>
@@ -40,10 +91,10 @@ function Shell({ children }: { children: ReactNode }) {
       <nav className={`nav-links ${menuOpen ? "is-open" : ""}`} aria-label="Main navigation">
         {navItems.map(({ href, label }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === "/herbs" && location.startsWith("/herbs/")) ? "active" : ""}`} aria-current={location === href ? "page" : undefined}>{label}</Link>)}
       </nav>
-      <div className="top-note"><span className="status-dot"/><span>Learning reference</span></div>
+      <div className="top-note"><span className="status-dot"/><span>Learning reference</span></div>{accountActions}
     </header>
     <main className="page-wrap">{children}</main>
-    <footer className="footer"><div><span className="footer-brand">HERBORA AI</span><span>Botanical knowledge, carefully contextualized.</span></div><Link href="/evidence-safety">Educational use only <ArrowRight size={14}/></Link></footer>
+    <footer className="footer"><div className="footer-copy"><span className="footer-brand">HERBORA AI</span><span>AI-Based Ayurvedic Herbal Knowledge and Recommendation System · academic project.</span><span>Data-source attribution: no external dataset source was supplied for these local sample records.</span></div><nav className="footer-nav" aria-label="Footer navigation"><Link href="/herbs">Explore herbs</Link><Link href="/search">Search</Link><Link href="/about">About project</Link><Link href="/evidence-safety">Evidence & safety <ArrowRight size={14}/></Link></nav><p className="footer-disclaimer">Educational use only. Not medical advice.</p></footer>
   </div>;
 }
 
@@ -51,36 +102,62 @@ function PageIntro({ eyebrow, title, description, aside }: { eyebrow: string; ti
   return <div className="page-intro"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="intro-copy">{description}</p></div>{aside && <div className="intro-aside">{aside}</div>}</div>;
 }
 
-function HerbVisual({ herb, className = "" }: { herb: Herb; className?: string }) {
-  const [failed, setFailed] = useState(false);
-  return <div className={`herb-visual ${className}`} aria-label={herb.imageUrl && !failed ? `${herb.commonName} image` : `${herb.commonName} botanical illustration placeholder`}>
-    {herb.imageUrl && !failed ? <img src={herb.imageUrl} alt={herb.commonName} onError={() => setFailed(true)}/> :
-      <div className={`plant-placeholder plant-${herb.id}`} aria-hidden="true"><span className="botanical-ring"/><span className="plant-stem"/><span className="plant-leaf leaf-a"/><span className="plant-leaf leaf-b"/><span className="plant-leaf leaf-c"/><span className="plant-name">{herb.botanicalName.split(" ")[0]}</span></div>}
-  </div>;
+function HerbCard({ herb, list = false }: { herb: Herb; list?: boolean }) {
+  const [, setLocation] = useLocation();
+  const { user } = useUser();
+  const { saved, toggle } = useSavedHerbs(user?.id);
+  const bookmarked = saved.includes(herb.id);
+  const categories = [
+    ...(herb.properties.length ? ["Properties"] : []),
+    ...(herb.constituents.length ? ["Constituents"] : []),
+    ...(herb.references.length ? ["References"] : []),
+  ];
+  return <article className="saved-card" data-testid={`card-herb-${herb.id}`}>
+    <Link href={`/herbs/${herb.id}`} className={`herb-card ${list ? "list-card" : ""}`}>
+      <HerbVisual herb={herb}/><div className="herb-card-copy"><span className="micro-label">{herb.family || "Family not recorded"}</span><h3>{herb.commonName}</h3><p className="latin">{herb.botanicalName}</p><p className="herb-summary">{herb.overview || "No summary has been added to this record."}</p><div className="chip-row">{herb.plantParts.map((part) => <span className="chip" key={part}>{part}</span>)}{categories.map((item) => <span className="chip" key={item}>{item}</span>)}</div></div><span className="card-arrow" aria-hidden="true"><ArrowRight size={16}/></span>
+    </Link>
+    <button type="button" className="bookmark-button" aria-label={bookmarked ? `Remove ${herb.commonName} from saved herbs` : `Save ${herb.commonName}`} aria-pressed={bookmarked} onClick={() => user ? toggle(herb.id) : setLocation("/sign-in")}><Bookmark size={18} fill={bookmarked ? "currentColor" : "none"}/></button>
+  </article>;
 }
 
-function HerbCard({ herb, list = false }: { herb: Herb; list?: boolean }) {
-  return <Link href={`/herbs/${herb.id}`} className={`herb-card ${list ? "list-card" : ""}`} data-testid={`card-herb-${herb.id}`}>
-    <HerbVisual herb={herb}/><div className="herb-card-copy"><span className="micro-label">{herb.family || "Family not recorded"}</span><h3>{herb.commonName}</h3><p className="latin">{herb.botanicalName}</p><div className="chip-row">{herb.plantParts.map((part) => <span className="chip" key={part}>{part}</span>)}</div></div><span className="card-arrow" aria-hidden="true"><ArrowRight size={16}/></span>
-  </Link>;
+function HerbBookmark({ herbId, herbName }: { herbId: string; herbName: string }) {
+  const [, setLocation] = useLocation();
+  const { user } = useUser();
+  const { saved, toggle } = useSavedHerbs(user?.id);
+  const bookmarked = saved.includes(herbId);
+  return <button type="button" className="button button-outline profile-bookmark" aria-pressed={bookmarked} onClick={() => user ? toggle(herbId) : setLocation("/sign-in")}><Bookmark size={16} fill={bookmarked ? "currentColor" : "none"}/>{bookmarked ? "Saved to your field notes" : `Save ${herbName}`}</button>;
 }
 
 function Overview() {
+  const featured = herbs.slice(0, 4);
   return <><PageMeta title="Overview" description="A careful learning space for Ayurvedic herbal knowledge."/>
     <section className="hero">
-      <div className="hero-content"><p className="eyebrow"><span className="eyebrow-line"/>A living study companion</p><h1>Learn the plant.<br/><em>Question the claim.</em></h1><p className="hero-copy">HERBORA brings botanical reference, traditional context and evidence boundaries into one thoughtful place for students and researchers.</p><div className="hero-actions"><Link href="/herbs" className="button button-primary">Explore the library <ArrowRight size={16}/></Link><Link href="/about" className="text-link">How this works <ArrowRight size={15}/></Link></div><div className="hero-footnote"><span>01 / 03</span><span className="footnote-rule"/><span>A learning tool, not a clinical resource</span></div></div>
-      <div className="hero-art" aria-hidden="true"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="sun-disc"/><div className="hero-leaf leaf-large"/><div className="hero-leaf leaf-small"/><div className="hero-plant-line"/><span className="art-caption">BOTANICAL<br/>OBSERVATION</span><span className="art-index">H · 01</span><span className="hero-plant-label">A study starts<br/>with looking closer.</span></div>
+      <div className="hero-content"><p className="eyebrow"><span className="eyebrow-line"/>AYURVEDIC HERBAL INTELLIGENCE</p><h1>Discover the intelligence<br/><em>within every leaf.</em></h1><p className="hero-copy">Explore medicinal plant identification, structured Ayurvedic herbal knowledge, related botanical properties, and research references through one intelligent platform.</p><div className="hero-actions"><Link href="/identify" className="button button-primary">Identify a Herb <ArrowRight size={16}/></Link><Link href="/herbs" className="button button-outline">Explore Herbal Library</Link></div><div className="hero-footnote"><span>FIELD NOTES / 01</span><span className="footnote-rule"/><span>A learning tool, not a clinical resource</span></div></div>
+      <div className="hero-art" aria-hidden="true"><img className="hero-botanical-photo" src={`${import.meta.env.BASE_URL}botanical-hero.png`} alt=""/><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="sun-disc"/><div className="hero-leaf leaf-large"/><div className="hero-leaf leaf-small"/><div className="hero-plant-line"/><span className="art-caption">BOTANICAL<br/>OBSERVATION</span><span className="art-index">H · 01</span><span className="hero-plant-label">A study starts<br/>with looking closer.</span></div>
     </section>
     <section className="overview-band"><div><span className="stat-number">06</span><span className="stat-label">sample herb records</span></div><p>Small by design. Every profile separates traditional knowledge from research references, and leaves unsupported fields blank.</p><Link href="/evidence-safety" className="under-link">Our evidence boundaries <ArrowRight size={15}/></Link></section>
-    <section className="section-block"><div className="section-heading"><div><p className="eyebrow">Choose a way in</p><h2>Begin with a question.</h2></div><Link className="text-link" href="/about">Our approach <ArrowRight size={15}/></Link></div>
+    <section className="section-block"><div className="section-heading"><div><p className="eyebrow">AYURVEDIC HERBAL INTELLIGENCE</p><h2>Begin with a question.</h2></div><Link className="text-link" href="/about">Our approach <ArrowRight size={15}/></Link></div>
       <div className="entry-grid">
-        <Link href="/identify" className="entry-card entry-terracotta"><span className="entry-num">01</span><ImagePlus size={22}/><h3>Look at a plant</h3><p>Explore the image-upload workflow. Identification is a demo only; no model is connected.</p><span className="entry-link">Try the demo <ArrowRight size={15}/></span></Link>
-        <Link href="/herbs" className="entry-card entry-sage"><span className="entry-num">02</span><BookOpen size={22}/><h3>Browse herb notes</h3><p>Search a small sample library by common name, family or plant part.</p><span className="entry-link">Open the library <ArrowRight size={15}/></span></Link>
-        <Link href="/search" className="entry-card entry-ivory"><span className="entry-num">03</span><Search size={22}/><h3>Follow a thread</h3><p>Find records with a local keyword search across documented fields.</p><span className="entry-link">Search notes <ArrowRight size={15}/></span></Link>
+        <Link href="/identify" className="entry-card entry-terracotta"><span className="entry-num">01</span><ImagePlus size={22}/><h3>AI Herb Identification</h3><p>Preview an image in your browser. Identification remains demo-only until a real prediction model is connected.</p><span className="entry-link">Open image study <ArrowRight size={15}/></span></Link>
+        <Link href="/herbs" className="entry-card entry-sage"><span className="entry-num">02</span><BookOpen size={22}/><h3>Herbal Knowledge Library</h3><p>Browse botanical names, recorded families and plant parts in the small local sample library.</p><span className="entry-link">Explore the library <ArrowRight size={15}/></span></Link>
+        <Link href="/recommendations" className="entry-card entry-ivory"><span className="entry-num">03</span><ArrowDownWideNarrow size={22}/><h3>Intelligent Recommendations</h3><p>Explore shared family and plant-part metadata; similarity does not imply health suitability.</p><span className="entry-link">Explore metadata <ArrowRight size={15}/></span></Link>
+        <Link href="/evidence-safety" className="entry-card entry-sage"><span className="entry-num">04</span><ShieldCheck size={22}/><h3>Evidence & Safety</h3><p>Separate traditional context from traceable research and source-linked safety notes.</p><span className="entry-link">Read the boundaries <ArrowRight size={15}/></span></Link>
       </div>
     </section>
+    <section className="overview-search"><div><p className="eyebrow">Search the sample library</p><h2>Find knowledge, naturally.</h2><p>Search names, plant families, parts and categories in this local reference set.</p></div><OverviewSearch/></section>
+    <section className="section-block featured-herbs"><div className="section-heading"><div><p className="eyebrow">Explore the botanical library</p><h2>Featured field notes.</h2></div><Link href="/herbs" className="text-link">See all six records <ArrowRight size={15}/></Link></div><div className="herb-grid">{featured.map((herb) => <HerbCard key={herb.id} herb={herb}/>)}</div><p className="dataset-footnote">Only factual fields supplied by the local sample data are shown; blank sections remain absent.</p></section>
+    <section className="workflow-section"><div className="section-heading"><div><p className="eyebrow">A transparent workflow</p><h2>From observation to context.</h2></div><Link href="/about" className="text-link">Read our method <ArrowRight size={15}/></Link></div><div className="workflow-steps"><article><span>01</span><h3>Start with a record</h3><p>Search or filter botanical entries by their recorded name, family, plant part or study category.</p></article><article><span>02</span><h3>Review what exists</h3><p>Open a profile to see attributed traditional context and documented fields. Empty fields are not guessed into completeness.</p></article><article><span>03</span><h3>Follow the evidence</h3><p>Check linked references and safety notes where available, then read the limits of this educational dataset.</p></article></div></section>
+    <section className="research-path"><div><p className="eyebrow">Research & safety</p><h2>Keep evidence and tradition distinct.</h2><p>HERBORA shows source-linked research and safety records only when the dataset includes them. No references or medical claims are invented to fill a gap.</p></div><Link href="/evidence-safety" className="button button-primary">Read evidence & safety <ArrowRight size={16}/></Link></section>
     <section className="note-strip"><div className="note-icon"><FlaskConical size={22}/></div><div><p className="eyebrow">A note on what this is</p><h2>Curiosity, with clear edges.</h2><p>Traditional use is not the same as clinical evidence. HERBORA is an educational prototype and does not provide diagnosis, treatment, or medical advice.</p></div><Link href="/evidence-safety" className="button button-outline">Read evidence & safety</Link></section>
   </>;
+}
+
+function OverviewSearch() {
+  const [query, setQuery] = useState("");
+  const [, setLocation] = useLocation();
+  return <form className="overview-search-form" onSubmit={(event) => { event.preventDefault(); if (query.trim()) setLocation(`/search?q=${encodeURIComponent(query.trim())}`); }}>
+    <Search size={19}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search a herb, botanical name, property, or formulation..." aria-label="Search a herb, botanical name, property, or formulation"/><button className="button button-primary" type="submit" disabled={!query.trim()}>Search <ArrowRight size={15}/></button>
+  </form>;
 }
 
 function IdentifyPage() {
@@ -107,7 +184,7 @@ function IdentifyPage() {
     catch { setError("The demo service could not process this file. Try again."); }
     finally { setLoading(false); }
   };
-  return <><PageMeta title="Identify a plant" description="Image upload demo for future plant identification."/><PageIntro eyebrow="Image study · demo" title="Start with an image." description="Add a plant image to explore the planned identification flow. This prototype has no trained model connected, so it cannot identify the plant."/>
+  return <><PageMeta title="Identify a medicinal herb" description="Upload and preview a plant image in the browser. Real image identification is not connected."/><PageIntro eyebrow="Image study · demo mode" title="Identify a medicinal herb." description="Upload a clear leaf or plant image to explore a possible match. This prototype has no trained model connected, so it cannot identify the plant or generate a confidence score."/>
     <div className="identify-layout"><section className="upload-panel">
       <div className="panel-topline"><span className="eyebrow">01 / Upload</span><span className="file-limit">JPG · PNG · WEBP <i/> UP TO 10 MB</span></div>
       {!file ? <div className="drop-zone" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); processFile(e.dataTransfer.files[0]); }} aria-label="Drop an image here">
@@ -115,9 +192,9 @@ function IdentifyPage() {
         <div className="upload-icon"><Upload size={24}/></div><h2>Drop a plant image here</h2><p>or choose a file from your device</p><button type="button" className="button button-outline" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>Browse files</button><small>For this demo, the image stays in your browser.</small>
       </div> : <div className="preview-box"><img src={preview} alt={`Preview of ${file.name}`}/><div className="preview-caption"><span><b>{file.name}</b><small>{(file.size / 1024 / 1024).toFixed(2)} MB · ready to review</small></span><button className="icon-button" type="button" onClick={remove} aria-label="Remove image"><X size={18}/></button></div></div>}
       {error && <p className="form-error" role="alert"><CircleAlert size={16}/>{error}</p>}
-      {file && <div className="upload-actions"><button type="button" className="text-link" onClick={() => inputRef.current?.click()}>Replace image</button><button type="button" className="button button-primary" disabled={loading} onClick={analyze}>{loading ? <><LoaderCircle className="spin" size={16}/> Preparing…</> : <>Continue to demo <ArrowRight size={16}/></>}</button></div>}
+       {file && <div className="upload-actions"><button type="button" className="text-link" onClick={() => inputRef.current?.click()}>Replace image</button><button type="button" className="button button-primary" disabled={loading} onClick={analyze}>{loading ? <><LoaderCircle className="spin" size={16}/> Preparing demo status…</> : <>Analyze image <ArrowRight size={16}/></>}</button></div>}
       {result && <div className="demo-result" role="status"><span className="result-stamp"><Info size={18}/></span><div><strong>Demo result — model not connected</strong><p>No identification or confidence score has been generated. Connect a trained model API to enable this step.</p><button type="button" className="text-link" onClick={remove}>Analyze another image <ArrowRight size={14}/></button></div></div>}
-    </section><aside className="identify-aside"><div className="aside-mark"><Leaf size={23}/></div><p className="eyebrow">Before you begin</p><h2>A photograph is a starting point, not proof.</h2><p>Reliable plant identification can depend on leaves, flowers, fruit, habitat and season. Never rely on an image match to decide whether a plant is safe to use.</p><div className="fine-rule"/><p className="small-note">Nothing is uploaded to a server in this demo. The future integration should send only the chosen file to a dedicated identification endpoint, with consent and retention rules made clear.</p><Link href="/about" className="under-link">Read the API notes <ArrowRight size={14}/></Link></aside></div>
+      </section><aside className="identify-aside"><div className="aside-mark"><Leaf size={23}/></div><p className="eyebrow">Before you begin</p><h2>A photograph is a starting point, not proof.</h2><p>Reliable plant identification can depend on leaves, flowers, fruit, habitat and season. Never rely on an image match to decide whether a plant is safe to use.</p><div className="fine-rule"/><p className="eyebrow">Image tips</p><ul className="clean-list"><li>Use a clear, focused leaf image.</li><li>Prefer natural lighting.</li><li>Avoid heavily blurred images.</li><li>Include one prominent leaf when possible.</li></ul><div className="fine-rule"/><p className="small-note">Nothing is uploaded to a server in this demo. The future integration should send only the chosen file to a dedicated identification endpoint, with consent and retention rules made clear.</p><Link href="/about" className="under-link">Read the API notes <ArrowRight size={14}/></Link></aside></div>
   </>;
 }
 
@@ -129,7 +206,7 @@ function LibraryPage() {
   const categories = useMemo(() => [...new Set(herbs.map((h) => h.studyCategory).filter(Boolean))] as string[], []);
   useEffect(() => { let alive = true; setLoading(true); getHerbs({ query, family, part, category, sort }).then((data) => { if (alive) { setResults(data); setFailed(false); } }).catch(() => { if (alive) setFailed(true); }).finally(() => { if (alive) setLoading(false); }); return () => { alive = false; }; }, [query, family, part, category, sort]);
   const clear = () => { setQuery(""); setFamily(""); setPart(""); setCategory(""); };
-  return <><PageMeta title="Herb library" description="Search and filter HERBORA sample herb records."/><PageIntro eyebrow="Reference library" title="A small field guide." description="Browse the current sample records. Each entry is intentionally modest: details appear only when present in the local reference data." aside={<span className="collection-count"><b>06</b><small>sample entries</small></span>}/>
+  return <><PageMeta title="Explore the herbal library" description="Search and filter the local HERBORA sample herb records."/><PageIntro eyebrow="Reference library" title="Explore the herbal library." description="Browse medicinal plants by common name, botanical name, family and plant part. Open a profile to review the details present in this local sample; unavailable fields remain clearly marked." aside={<span className="collection-count"><b>06</b><small>sample entries</small></span>}/>
     <section className="library-controls"><label className="search-field"><Search size={18}/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search names, family, plant parts…" aria-label="Search herb library" data-testid="input-library-search"/>{query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search"><X size={16}/></button>}</label>
       <div className="filter-row"><label>Family <span className="select-wrap"><select value={family} onChange={(e) => setFamily(e.target.value)} aria-label="Filter by family"><option value="">All families</option>{families.map((v) => <option key={v}>{v}</option>)}</select><ChevronDown size={14}/></span></label><label>Plant part <span className="select-wrap"><select value={part} onChange={(e) => setPart(e.target.value)} aria-label="Filter by plant part"><option value="">All parts</option>{parts.map((v) => <option key={v}>{v}</option>)}</select><ChevronDown size={14}/></span></label><label>Category <span className="select-wrap"><select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category"><option value="">All categories</option>{categories.map((v) => <option key={v}>{v}</option>)}</select><ChevronDown size={14}/></span></label><label className="sort-label"><span>Sort</span><span className="select-wrap"><select value={sort} onChange={(e) => setSort(e.target.value as "name" | "botanical")} aria-label="Sort herbs"><option value="name">Common name</option><option value="botanical">Botanical name</option></select><ChevronDown size={14}/></span></label><div className="view-toggle" aria-label="View layout"><button type="button" onClick={() => setLayout("grid")} className={layout === "grid" ? "selected" : ""} aria-label="Grid view" aria-pressed={layout === "grid"}><Grid2X2 size={17}/></button><button type="button" onClick={() => setLayout("list")} className={layout === "list" ? "selected" : ""} aria-label="List view" aria-pressed={layout === "list"}><List size={18}/></button></div></div>
       <div className="results-line"><span>{loading ? "Updating records…" : `${results.length} ${results.length === 1 ? "record" : "records"} found`}</span>{(query || family || part || category) && <button type="button" className="text-link" onClick={clear}>Clear filters <X size={14}/></button>}</div>
@@ -141,7 +218,7 @@ function LibraryPage() {
   </>;
 }
 
-function ProfilePage() {
+function HerbProfilePage() {
   const { id = "" } = useParams<{ id: string }>();
   const [herb, setHerb] = useState<Herb | undefined>(); const [safety, setSafety] = useState<Awaited<ReturnType<typeof getSafetyInformation>>>([]); const [ready, setReady] = useState(false);
   useEffect(() => { setReady(false); Promise.all([getHerbById(id), getSafetyInformation(id)]).then(([record, records]) => { setHerb(record); setSafety(records); }).finally(() => setReady(true)); }, [id]);
@@ -149,7 +226,7 @@ function ProfilePage() {
   if (!herb) return <><PageMeta title="Record not found" description="No herb record found."/><div className="empty-state"><Leaf size={28}/><h1>That record isn't in the field notes.</h1><p>The sample library may not include this plant.</p><Link href="/herbs" className="button button-primary">Return to library <ArrowRight size={16}/></Link></div></>;
   const siblings = herbs.filter((item) => item.id !== herb.id && (item.family === herb.family || item.plantParts.some((part) => herb.plantParts.includes(part)))).slice(0, 3);
   return <><PageMeta title={herb.commonName} description={`Educational botanical profile for ${herb.commonName}.`}/><Link href="/herbs" className="back-link"><ArrowLeft size={15}/> Back to library</Link>
-    <section className="profile-head"><HerbVisual herb={herb}/><div><p className="eyebrow">Herb record · sample data</p><h1>{herb.commonName}</h1><p className="profile-latin">{herb.botanicalName}</p><div className="profile-tags"><span className="chip">{herb.family || "Family not recorded"}</span>{herb.plantParts.map((item) => <span className="chip" key={item}>{item}</span>)}</div><p className="profile-overview">{herb.overview || "No overview has been added to this record."}</p></div><div className="record-stamp">FIELD<br/>NOTE<br/><b>0{herbs.indexOf(herb) + 1}</b></div></section>
+     <section className="profile-head"><HerbVisual herb={herb}/><div><p className="eyebrow">Herb record · sample data</p><h1>{herb.commonName}</h1><p className="profile-latin">{herb.botanicalName}</p><div className="profile-tags"><span className="chip">{herb.family || "Family not recorded"}</span>{herb.plantParts.map((item) => <span className="chip" key={item}>{item}</span>)}</div><p className="profile-overview">{herb.overview || "No overview has been added to this record."}</p><HerbBookmark herbId={herb.id} herbName={herb.commonName}/></div><div className="record-stamp">FIELD<br/>NOTE<br/><b>0{herbs.indexOf(herb) + 1}</b></div></section>
     <div className="profile-columns"><div className="profile-main">
       <section className="info-section"><p className="eyebrow">Traditional knowledge</p><h2>Use in traditional context</h2>{herb.traditionalUses.length ? <ul className="clean-list">{herb.traditionalUses.map((item) => <li key={item}>{item}</li>)}</ul> : <p className="missing-note">No traditional-use notes have been added to this record.</p>}<p className="section-caveat">Traditional knowledge is presented as cultural and historical context, not as evidence of clinical efficacy.</p></section>
       <section className="info-section"><p className="eyebrow">Documented fields</p><h2>What this record contains</h2><div className="data-rows"><DataRow label="Properties" count={herb.properties.length}/><DataRow label="Constituents" count={herb.constituents.length}/><DataRow label="Formulations" count={herb.formulations.length}/><DataRow label="Evidence references" count={herb.references.length}/></div>
@@ -167,14 +244,26 @@ function DataRow({ label, count }: { label: string; count: number }) { return <d
 function RecordList({ title, items }: { title: string; items: string[] }) { return <div className="profile-record-list"><h3>{title}</h3><ul className="clean-list">{items.map((item) => <li key={item}>{item}</li>)}</ul></div>; }
 
 function SearchPage() {
-  const [query, setQuery] = useState(""); const [submitted, setSubmitted] = useState(""); const [results, setResults] = useState<Herb[]>([]); const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get("q") || ""); const [submitted, setSubmitted] = useState(""); const [results, setResults] = useState<Herb[]>([]); const [loading, setLoading] = useState(false);
   const [recent, setRecent] = useState<string[]>(() => { try { return JSON.parse(sessionStorage.getItem("herbora-recent-searches") || "[]") as string[]; } catch { return []; } });
   const run = async (value = query) => { const q = value.trim(); if (!q) return; setQuery(q); setSubmitted(q); setLoading(true); try { const found = await searchHerbs(q); setResults(found); const next = [q, ...recent.filter((item) => item.toLowerCase() !== q.toLowerCase())].slice(0, 5); setRecent(next); sessionStorage.setItem("herbora-recent-searches", JSON.stringify(next)); } finally { setLoading(false); } };
+  useEffect(() => { const initial = new URLSearchParams(window.location.search).get("q"); if (initial?.trim()) void run(initial); }, []);
   const clearRecent = () => { setRecent([]); sessionStorage.removeItem("herbora-recent-searches"); };
-  return <><PageMeta title="Search notes" description="Local keyword search across sample herb records."/><PageIntro eyebrow="Find a thread" title="Search the notes." description="A local keyword and typo-tolerant search across names, botanical names, plant families, parts and study categories. No search is sent to a server."/>
-    <form className="search-page-form" onSubmit={(e) => { e.preventDefault(); void run(); }}><Search size={21}/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Try a plant name or family…" aria-label="Search field notes" data-testid="input-search"/><button type="submit" className="button button-primary" disabled={!query.trim() || loading}>{loading ? "Searching…" : "Search"} <ArrowRight size={15}/></button></form>
-    <div className="search-examples"><span className="micro-label">Try an example</span>{["Lamiaceae", "rhizome", "amla", "Withania"].map((item) => <button type="button" key={item} onClick={() => { setQuery(item); void run(item); }}>{item}</button>)}</div>
-    <div className="search-columns"><section className="search-results">{submitted ? <><div className="section-heading"><div><p className="eyebrow">Search results</p><h2>{results.length} {results.length === 1 ? "match" : "matches"} for “{submitted}”</h2></div></div>{results.length ? <div className="herb-grid is-list">{results.map((herb) => <HerbCard key={herb.id} herb={herb} list/>)}</div> : <div className="empty-state compact"><Search size={24}/><h3>No close matches.</h3><p>Try a broader term such as a plant part or family.</p></div>}</> : <div className="search-prompt"><div className="prompt-mark"><Leaf size={22}/></div><p className="eyebrow">Local reference search</p><h2>One good question<br/>can open a field.</h2><p>Searches match only fields currently present in the sample records.</p></div>}</section>
+  return <><PageMeta title="Intelligent search" description="Local keyword search across available sample herb records."/><PageIntro eyebrow="Local research tool" title="Find knowledge, naturally." description="Search names, botanical names, families, plant parts and categories in the current local records. Search is keyword-based, typo-tolerant and never sent to a server."/>
+    <form className="search-page-form" onSubmit={(e) => { e.preventDefault(); void run(); }}><Search size={21}/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ask about a herb, plant part, property, or formulation..." aria-label="Search about a herb, plant part, property, or formulation" data-testid="input-search"/><button type="submit" className="button button-primary" disabled={!query.trim() || loading}>{loading ? "Searching…" : "Search"} <ArrowRight size={15}/></button></form>
+    <div className="search-examples"><span className="micro-label">Try an example</span>{["Tell me about Tulsi", "Explore the botanical profile of Neem", "Show herbs with documented similar properties", "Find formulations associated with a herb"].map((item) => <button type="button" key={item} onClick={() => { setQuery(item); void run(item); }}>{item}</button>)}</div>
+    <div className="search-columns"><section className="search-results">{submitted ? <><div className="section-heading"><div><p className="eyebrow">Search results</p><h2>{results.length} {results.length === 1 ? "match" : "matches"} for “{submitted}”</h2></div></div>{results.length ? <div className="herb-grid is-list">{results.map((herb) => {
+      const terms = submitted.toLocaleLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((term) => term.length > 2 && !["tell","about","explore","the","botanical","profile","show","herbs","with","documented","similar","find","formulations","associated"].includes(term));
+      const searchable = [
+        ["Common name", herb.commonName], ["Botanical name", herb.botanicalName], ["Family", herb.family || ""],
+        ["Plant parts", herb.plantParts.join(" ")], ["Study category", herb.studyCategory || ""], ["Overview", herb.overview || ""],
+        ["Traditional context", herb.traditionalUses.join(" ")], ["Properties", herb.properties.map((item) => `${item.name} ${item.description || ""}`).join(" ")],
+        ["Constituents", herb.constituents.map((item) => `${item.name} ${item.note || ""}`).join(" ")],
+        ["Formulations", herb.formulations.map((item) => `${item.name} ${item.note || ""}`).join(" ")],
+      ];
+      const matched = searchable.filter(([, value]) => terms.some((term) => String(value).toLocaleLowerCase().includes(term))).map(([label]) => label);
+      return <div className="search-result-item" key={herb.id}><HerbCard herb={herb} list/><p className="match-fields"><span>Matched recorded fields</span>{matched.length ? matched.join(" · ") : "Close spelling match in the sample record"}</p></div>;
+    })}</div> : <div className="empty-state compact"><Search size={24}/><h3>No close matches.</h3><p>Try a common or botanical name, a documented family, or a plant part present in the sample records.</p></div>}</> : <div className="search-prompt"><div className="prompt-mark"><Leaf size={22}/></div><p className="eyebrow">Local reference search</p><h2>One good question<br/>can open a field.</h2><p>Searches match only fields currently present in the sample records.</p></div>}</section>
       <aside className="recent-panel"><div className="section-heading"><div><p className="eyebrow">This session only</p><h3>Recent searches</h3></div>{recent.length > 0 && <button type="button" className="subtle-button" onClick={clearRecent}>Clear</button>}</div>{recent.length ? <ul>{recent.map((item) => <li key={item}><button type="button" onClick={() => void run(item)}><Search size={14}/>{item}<ArrowRight size={14}/></button></li>)}</ul> : <p className="missing-note">Search terms you run will appear here until this browser session ends.</p>}</aside></div>
   </>;
 }
@@ -191,30 +280,86 @@ function RecommendationsPage() {
 }
 
 function EvidencePage() {
-  const [evidence, setEvidence] = useState<Awaited<ReturnType<typeof getEvidence>>>([]); const [safety, setSafety] = useState<Awaited<ReturnType<typeof getSafetyInformation>>>([]);
+  const [evidence, setEvidence] = useState<Awaited<ReturnType<typeof getEvidence>>>([]); const [safety, setSafety] = useState<Awaited<ReturnType<typeof getSafetyInformation>>>([]); const [filter, setFilter] = useState("");
   useEffect(() => { Promise.all([getEvidence(), getSafetyInformation()]).then(([refs, records]) => { setEvidence(refs); setSafety(records); }); }, []);
-  return <><PageMeta title="Evidence & safety" description="Understand reference availability and limitations of this educational prototype."/><PageIntro eyebrow="Read with care" title="What the record can—and can't—say." description="Clear provenance matters. This page distinguishes traditional knowledge from scientific research, and makes gaps visible rather than filling them with assumptions."/>
-    <div className="evidence-callout"><div className="callout-mark"><ShieldCheck size={23}/></div><div><p className="eyebrow">Educational disclaimer</p><h2>HERBORA AI is not medical advice.</h2><p>Information here is for education and research orientation only. It is not intended to diagnose, treat, cure or prevent any condition. Do not use an image demo or this reference library to make health decisions. Consult a qualified health professional for personal care.</p></div></div>
+  const filteredEvidence = evidence.filter((ref) => `${ref.title} ${ref.topic} ${ref.category} ${ref.authors?.join(" ") || ""}`.toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
+  return <><PageMeta title="Evidence & safety" description="Understand reference availability and limitations of this educational prototype."/><PageIntro eyebrow="Read with care" title="Evidence deserves context." description="Clear provenance matters. This page distinguishes traditional knowledge from scientific research, and makes gaps visible rather than filling them with assumptions."/>
+    <div className="evidence-callout"><div className="callout-mark"><ShieldCheck size={23}/></div><div><p className="eyebrow">Educational disclaimer</p><h2>HERBORA AI is not medical advice.</h2><p>This platform is for educational and research purposes. It does not replace professional medical advice, diagnosis, or treatment. Herb identification may be uncertain, and absence of a listed interaction does not establish safety.</p></div></div>
     <div className="evidence-columns"><section className="evidence-panel"><span className="evidence-number">01</span><BookOpen size={21}/><p className="eyebrow">Traditional knowledge</p><h2>A cultural and historical record.</h2><p>Traditional-use notes describe knowledge traditions as attributed in the sample data. They do not establish clinical efficacy, dosage or safety.</p><div className="evidence-rule"/><span className="evidence-state">No sourced traditional-use details supplied</span></section><section className="evidence-panel evidence-research"><span className="evidence-number">02</span><FlaskConical size={21}/><p className="eyebrow">Scientific research</p><h2>References only when sourced.</h2><p>Research references should include traceable bibliographic details. No references are currently supplied in this prototype dataset.</p><div className="evidence-rule"/><span className="evidence-state">{evidence.length} verified references available</span></section></div>
-    <section className="reference-list"><div className="section-heading"><div><p className="eyebrow">Source ledger</p><h2>Reference records</h2></div></div>{evidence.length ? evidence.map((ref) => <article key={ref.id} className="reference-entry"><p className="eyebrow">{ref.category} · {ref.topic}</p><h3>{ref.title}</h3><p>{ref.authors?.join(", ") || "Authors not recorded"}{ref.year ? ` · ${ref.year}` : ""}</p>{ref.sourceUrl && <a href={ref.sourceUrl} target="_blank" rel="noreferrer" className="under-link">Open source <ArrowRight size={14}/></a>}</article>) : <div className="reference-empty"><Info size={19}/><p><b>No evidence references supplied.</b><br/>No papers, authors, DOIs or clinical outcomes are shown because none are included in the current sample data.</p></div>}</section>
+    <section className="reference-list"><div className="section-heading"><div><p className="eyebrow">Source ledger</p><h2>Reference records</h2></div></div><label className="search-field evidence-search"><Search size={18}/><input value={filter} onChange={(event) => setFilter(event.target.value)} aria-label="Filter research references" placeholder="Search publication, topic, category, or author"/></label>{evidence.length ? filteredEvidence.length ? filteredEvidence.map((ref) => <article key={ref.id} className="reference-entry"><p className="eyebrow">{ref.category} · {ref.topic}</p><h3>{ref.title}</h3><p>{ref.authors?.join(", ") || "Authors not recorded"}{ref.year ? ` · ${ref.year}` : ""}</p>{ref.doi && <p>DOI: {ref.doi}</p>}{ref.sourceUrl && <a href={ref.sourceUrl} target="_blank" rel="noreferrer" className="under-link">Open source <ArrowRight size={14}/></a>}</article>) : <div className="reference-empty"><Info size={19}/><p>No references match that filter. Try a different title, topic, or author.</p></div> : <div className="reference-empty"><Info size={19}/><p><b>No evidence references supplied.</b><br/>No papers, authors, DOIs or clinical outcomes are shown because none are included in the current sample data.</p></div>}</section>
     <section className="safety-section"><div><p className="eyebrow">Safety ledger</p><h2>Absence of a note is not assurance.</h2><p>Safety records are included only when source-linked data exists. This prototype has {safety.length} safety record{ safety.length === 1 ? "" : "s" }. Blank records do not imply that an herb is safe or free of interactions.</p></div><ShieldCheck size={24}/></section>
   </>;
 }
 
 function AboutPage() {
-  return <><PageMeta title="About & method" description="HERBORA AI project scope, methodology, limitations and API integration notes."/><PageIntro eyebrow="Project notes" title="A learning tool in progress." description="HERBORA AI is a frontend prototype for studying Ayurvedic herb records with a transparent boundary between what works, what is planned and what remains unknown."/>
-    <section className="about-lead"><span className="large-quote">“</span><div><p className="eyebrow">Design principle</p><h2>Make the limits as legible<br/>as the knowledge.</h2><p>We want a useful reference surface that invites close reading—not an authority that replaces it.</p></div><div className="leaf-engraving" aria-hidden="true"><Sprout size={78}/></div></section>
+  return <><PageMeta title="About project" description="Project scope, workflow, methodology and limitations of the HERBORA AI educational prototype."/><PageIntro eyebrow="Project notes" title="A learning tool in progress." description="HERBORA AI is an AI-Based Ayurvedic Herbal Knowledge and Recommendation System: an academic project exploring a transparent interface for botanical records, image-upload workflows and metadata-based discovery."/>
+    <section className="about-lead"><span className="large-quote">“</span><div><p className="eyebrow">Project overview</p><h2>Make the limits as legible<br/>as the knowledge.</h2><p>The problem this project explores is fragmented plant knowledge and the need to keep attributed traditional context distinct from source-linked research. The goal is a study interface, not a clinical authority.</p></div><div className="leaf-engraving" aria-hidden="true"><Sprout size={78}/></div></section>
+    <section className="project-detail-grid"><article><span className="method-number">01</span><h3>Objectives</h3><ul><li>Explore image-upload interaction without inventing a prediction.</li><li>Organize the fields present in a small herb dataset.</li><li>Search locally and explain metadata-based relationships.</li><li>Make evidence and safety gaps visible.</li></ul></article><article><span className="method-number">02</span><h3>Proposed image workflow</h3><p>Image input → preprocessing → image classification model → predicted herb → structured knowledge retrieval → metadata-based recommendations → evidence and safety presentation.</p><p className="account-help">The classification model is not connected in this frontend.</p></article><article><span className="method-number">03</span><h3>Search workflow</h3><p>Text query → local query processing → search across available record fields → relevant herb profiles.</p></article></section>
     <section className="section-block"><div className="section-heading"><div><p className="eyebrow">Prototype status</p><h2>Working now / planned next</h2></div></div><div className="status-columns"><article className="status-card"><span className="status-pill working"><span/>Working in this frontend</span><ul><li>Sample herb library, filters and local fuzzy keyword search</li><li>Herb profiles with empty fields explicitly visible</li><li>Metadata overlap links based on shared family and plant part</li><li>Image preview and validation in the browser</li><li>Session-only recent searches</li></ul></article><article className="status-card planned"><span className="status-pill planned-pill"><span/>Planned integration</span><ul><li>Python image-identification API with a documented model card</li><li>Reviewed, source-linked herb and safety records</li><li>Research references with traceable bibliographic details</li><li>API-backed search and recommendation services</li></ul></article></div></section>
     <section className="method-grid"><article><span className="method-number">01</span><h3>Image workflow</h3><p>Files are type-checked and limited to 10 MB. A local preview is created in the browser. The current identify service returns a model-not-connected status; it does not produce a species prediction or confidence score.</p></article><article><span className="method-number">02</span><h3>Text workflow</h3><p>Search runs against the local sample dataset over common and botanical names, family, plant parts and category. Recent terms are stored in session storage only and cleared when the session ends.</p></article><article><span className="method-number">03</span><h3>Recommendation logic</h3><p>Related entries are ranked by the count of shared, explicitly recorded family and plant-part features. No clinical, medicinal, dosha or personal suitability is predicted.</p></article></section>
     <section className="api-notes"><div><p className="eyebrow">For the next implementation</p><h2>API integration contract</h2><p>Local service functions are typed and replaceable in <code>src/lib/herb-service.ts</code>. Keep the UI contract stable when connecting a backend.</p></div><div className="contract"><div><span>POST</span><code>/identify</code><small>multipart image file → PredictionResult or explicit unavailable status</small></div><div><span>GET</span><code>/herbs</code><small>filters → Herb[] with field-level provenance</small></div><div><span>GET</span><code>/search · /recommendations</code><small>query or herb id → documented local matches and overlap reasons</small></div><p>Do not return a confidence score unless it is defined, calibrated, versioned and appropriate to display. No GPS, location tracking or device telemetry is part of the workflow.</p></div></section>
-    <div className="about-disclaimer"><Info size={18}/><p><b>Limitations:</b> Sample entries are not a complete pharmacopeia, clinical evidence base or safety reference. Traditional knowledge and scientific research are distinct forms of information. Verify all material against appropriate primary sources and qualified expertise.</p></div>
+    <section className="project-detail-grid project-detail-secondary"><article><h3>Methodology</h3><p>Image preprocessing and model classification are a proposed future integration. Current local search uses exact and typo-tolerant matching on recorded names, families, plant parts, categories and present text fields. Related records use only shared family and plant-part metadata.</p></article><article><h3>Dataset approach</h3><p>The current sample contains six locally defined herb records. Traditional-use details, constituents, formulations, citations and safety records are empty when none were supplied. No external dataset attribution was supplied with this frontend data.</p></article><article><h3>Future enhancements</h3><p>Connect a documented model endpoint, add reviewed source-linked records, define provenance for dataset updates and evaluate model performance before displaying prediction scores.</p></article></section>
+    <div className="about-disclaimer"><Info size={18}/><p><b>Limitations:</b> Sample entries are not a complete pharmacopeia, clinical evidence base or safety reference. Traditional knowledge and scientific research are distinct forms of information. Verify all material against appropriate primary sources and qualified expertise. No GPS, location tracking, blockchain, supply-chain or user telemetry features are part of this product.</p></div>
   </>;
 }
 
 function NotFound() { return <><PageMeta title="Page not found" description="The requested HERBORA page could not be found."/><div className="not-found"><span className="eyebrow">404 · off the path</span><h1>This page isn't in<br/><em>the field notes.</em></h1><p>It may have moved, or it may never have been recorded.</p><Link href="/" className="button button-primary"><ArrowLeft size={16}/> Return to overview</Link></div></>; }
 
 function RoutedErrorBoundary({ children }: { children: ReactNode }) { const [location] = useLocation(); return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>; }
-function Router() { return <RoutedErrorBoundary><Shell><Switch><Route path="/" component={Overview}/><Route path="/identify" component={IdentifyPage}/><Route path="/herbs" component={LibraryPage}/><Route path="/herbs/:id" component={ProfilePage}/><Route path="/search" component={SearchPage}/><Route path="/recommendations" component={RecommendationsPage}/><Route path="/evidence-safety" component={EvidencePage}/><Route path="/about" component={AboutPage}/><Route component={NotFound}/></Switch></Shell></RoutedErrorBoundary>; }
+function SignInPage() { return <><PageMeta title="Sign in" description="Sign in to your HERBORA AI learning account."/><section className="auth-page"><div className="auth-story"><div><p className="eyebrow">Welcome back to HERBORA AI</p><h1>Continue exploring botanical knowledge.</h1><p>Sign in to keep a local reading list of herb records on this device. Your search and study remain grounded in the available evidence.</p></div><div className="hero-footnote"><span>FIELD NOTES</span><span className="footnote-rule"/><span>Learning reference · not medical advice</span></div></div><div className="auth-form-wrap"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></div></section></>; }
+function SignUpPage() { return <><PageMeta title="Create account" description="Create a HERBORA AI account with Clerk."/><section className="auth-page"><div className="auth-story"><div><p className="eyebrow">A place for your field notes</p><h1>Create your HERBORA account.</h1><p>Use your account to keep saved herb bookmarks on this device. Authentication is handled by Clerk; HERBORA never stores your password.</p></div><div className="hero-footnote"><span>FIELD NOTES</span><span className="footnote-rule"/><span>Evidence boundaries stay visible</span></div></div><div className="auth-form-wrap"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></div></section></>; }
+function ForgotPasswordAlias() { return <Redirect to="/sign-in/forgot-password"/>; }
+function LoginAlias() { return <Redirect to="/sign-in"/>; }
+function SignupAlias() { return <Redirect to="/sign-up"/>; }
 
-function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}><Router/></WouterRouter><Toaster/></TooltipProvider></QueryClientProvider>; }
+function Router() {
+  return <RoutedErrorBoundary><Shell><Switch>
+    <Route path="/" component={Overview}/><Route path="/identify" component={IdentifyPage}/><Route path="/herbs" component={LibraryPage}/><Route path="/herbs/:id" component={HerbProfilePage}/>
+    <Route path="/search" component={SearchPage}/><Route path="/recommendations" component={RecommendationsPage}/><Route path="/evidence-safety" component={EvidencePage}/><Route path="/about" component={AboutPage}/>
+    <Route path="/profile" component={AccountProfilePage}/><Route path="/settings" component={SettingsPage}/><Route path="/saved-herbs" component={SavedHerbsPage}/>
+    <Route path="/login" component={LoginAlias}/><Route path="/signup" component={SignupAlias}/><Route path="/forgot-password" component={ForgotPasswordAlias}/>
+    <Route component={NotFound}/>
+  </Switch></Shell></RoutedErrorBoundary>;
+}
+
+function ClerkQueryClientCacheInvalidator() {
+  const { addListener } = useClerk();
+  const client = useQueryClient();
+  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const unsubscribe = addListener(({ user }) => {
+      const userId = user?.id ?? null;
+      if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) client.clear();
+      prevUserIdRef.current = userId;
+    });
+    return unsubscribe;
+  }, [addListener, client]);
+  return null;
+}
+
+function ClerkProviderWithRoutes() {
+  const [, setLocation] = useLocation();
+  return <ClerkProvider
+    publishableKey={clerkPubKey}
+    proxyUrl={clerkProxyUrl}
+    appearance={clerkAppearance}
+    signInUrl={`${basePath}/sign-in`}
+    signUpUrl={`${basePath}/sign-up`}
+    localization={{
+      signIn: { start: { title: "Welcome back to HERBORA AI", subtitle: "Continue exploring botanical knowledge and your saved research." } },
+      signUp: { start: { title: "Create your HERBORA account", subtitle: "Keep a personal reading list of field notes on this device." } },
+    }}
+    routerPush={(to) => setLocation(stripBase(to))}
+    routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+  >
+    <ClerkQueryClientCacheInvalidator/>
+    <Switch>
+      <Route path="/sign-in/*?" component={SignInPage}/>
+      <Route path="/sign-up/*?" component={SignUpPage}/>
+      <Route><Router/></Route>
+    </Switch>
+  </ClerkProvider>;
+}
+
+function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={basePath}><ClerkProviderWithRoutes/></WouterRouter><Toaster/></TooltipProvider></QueryClientProvider>; }
 export default App;
