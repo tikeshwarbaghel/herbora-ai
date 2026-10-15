@@ -7,8 +7,17 @@ function normalize(value: string) {
 }
 
 function searchScore(h: Herb, query: string) {
-  const q = normalize(query);
-  const fields = [h.commonName, h.botanicalName, h.family ?? "", ...h.plantParts, h.studyCategory ?? ""].map(normalize);
+  const requestWords = new Set(["tell", "me", "about", "explore", "the", "botanical", "profile", "of", "show", "herbs", "with", "documented", "similar", "find", "formulations", "associated", "a", "what", "is"]);
+  const q = normalize(query).split(/\s+/).filter((word) => !requestWords.has(word)).join(" ");
+  if (!q) return 0;
+  const fields = [
+    h.commonName, h.botanicalName, h.family ?? "", ...h.plantParts, h.studyCategory ?? "",
+    h.overview ?? "", ...h.traditionalUses,
+    ...h.properties.flatMap((item) => [item.name, item.description ?? ""]),
+    ...h.constituents.flatMap((item) => [item.name, item.note ?? ""]),
+    ...h.formulations.flatMap((item) => [item.name, item.note ?? ""]),
+    ...h.references.flatMap((item) => [item.title, item.topic, item.category]),
+  ].map(normalize);
   if (fields.some((field) => field === q)) return 100;
   if (fields.some((field) => field.includes(q))) return 70;
   const words = q.split(/\s+/).filter(Boolean);
