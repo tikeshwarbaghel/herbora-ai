@@ -1,11 +1,12 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ArrowDownWideNarrow, ArrowLeft, ArrowRight, Bookmark, BookOpen, Check, ChevronDown, CircleAlert, FlaskConical, Grid2X2, ImagePlus, Info, Leaf, List, LoaderCircle, Menu, Search, ShieldCheck, Sprout, Upload, UserRound, X } from "lucide-react";
+import { ArrowDownWideNarrow, ArrowLeft, ArrowRight, Bookmark, BookOpen, Check, ChevronDown, CircleAlert, FlaskConical, Grid2X2, ImagePlus, Info, Leaf, List, LoaderCircle, LogOut, Menu, Search, Settings, ShieldCheck, Sprout, Upload, UserRound, X } from "lucide-react";
 import { Link, Redirect, Route, Switch, Router as WouterRouter, useLocation, useParams } from "wouter";
 import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from "@clerk/react";
+import { useSignIn } from "@clerk/react/legacy";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
 import { herbs, type Herb } from "@/lib/herb-data";
@@ -67,6 +68,19 @@ const navItems = [
   { href: "/about", label: "About & method", icon: Info },
 ];
 
+const pageTitles: Record<string, string> = {
+  "/": "Overview",
+  "/identify": "Identify a herb",
+  "/herbs": "Herbal library",
+  "/search": "Search the library",
+  "/recommendations": "Related field notes",
+  "/evidence-safety": "Evidence & safety",
+  "/about": "About the project",
+  "/profile": "My profile",
+  "/saved-herbs": "Saved herbs",
+  "/settings": "Settings",
+};
+
 function PageMeta({ title, description }: { title: string; description: string }) {
   useEffect(() => {
     document.title = `${title} — HERBORA AI`;
@@ -79,22 +93,85 @@ function PageMeta({ title, description }: { title: string; description: string }
 
 function Shell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
+  const [, setLocation] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [globalQuery, setGlobalQuery] = useState("");
   const { user } = useUser();
   const { signOut } = useClerk();
-  useEffect(() => setMenuOpen(false), [location]);
-  const accountActions = user ? <div className="account-nav"><Link href="/profile" className="account-nav-link"><UserRound size={16}/><span>My profile</span></Link><Link href="/saved-herbs" className="account-nav-link"><Bookmark size={16}/><span>Saved</span></Link><Link href="/settings" className="account-nav-link"><span>Settings</span></Link><button className="account-nav-link" type="button" onClick={() => void signOut({ redirectUrl: basePath || "/" })}>Sign out</button></div> : <Link href="/sign-in" className="account-signin">Sign in <ArrowRight size={14}/></Link>;
+  const globalSearchRef = useRef<HTMLInputElement>(null);
+  const accountMenuRef = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    setMenuOpen(false);
+    if (accountMenuRef.current) accountMenuRef.current.open = false;
+  }, [location]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      event.preventDefault();
+      globalSearchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+  const activePage = pageTitles[location] ?? (location.startsWith("/herbs/") ? "Herb profile" : "Field notes");
+  const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.username || user?.primaryEmailAddress?.emailAddress || "HERBORA member";
+  const initials = displayName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+  const primaryItems = navItems.slice(0, 4);
+  const studyItems = navItems.slice(4);
   return <div className="app-shell">
-    <header className="topbar">
-      <Link href="/" className="brand" aria-label="HERBORA AI overview"><span className="brand-mark"><Sprout size={22}/></span><span><b>HERBORA</b><small>FIELD NOTES · AI</small></span></Link>
-      <button type="button" className="mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-label={menuOpen ? "Close navigation" : "Open navigation"}><Menu size={22}/></button>
-      <nav className={`nav-links ${menuOpen ? "is-open" : ""}`} aria-label="Main navigation">
-        {navItems.map(({ href, label }) => <Link key={href} href={href} className={`nav-link ${location === href || (href === "/herbs" && location.startsWith("/herbs/")) ? "active" : ""}`} aria-current={location === href ? "page" : undefined}>{label}</Link>)}
+    {menuOpen && <button type="button" className="sidebar-backdrop" aria-label="Close navigation" onClick={() => setMenuOpen(false)}/>}
+    <aside className={`sidebar ${menuOpen ? "is-open" : ""}`} id="primary-navigation">
+      <Link href="/" className="brand" aria-label="HERBORA AI overview" onClick={() => setMenuOpen(false)}>
+        <span className="brand-mark"><Sprout size={23}/></span>
+        <span><b>HERBORA</b><small>FIELD NOTES · AI</small></span>
+      </Link>
+      <div className="sidebar-rule"/>
+      <p className="sidebar-label">Explore</p>
+      <nav className="sidebar-nav" aria-label="Main navigation">
+        {primaryItems.map(({ href, label, icon: Icon }) => {
+          const active = location === href || (href === "/herbs" && location.startsWith("/herbs/"));
+          return <Link key={href} href={href} onClick={() => setMenuOpen(false)} className={`sidebar-link ${active ? "active" : ""}`} aria-current={active ? "page" : undefined} data-testid={`link-nav-${href === "/" ? "overview" : href.slice(1).replaceAll("/", "-")}`}><Icon size={18}/><span>{label}</span>{active && <span className="sidebar-active-mark"/>}</Link>;
+        })}
       </nav>
-      <div className="top-note"><span className="status-dot"/><span>Learning reference</span></div>{accountActions}
-    </header>
-    <main className="page-wrap">{children}</main>
-    <footer className="footer"><div className="footer-copy"><span className="footer-brand">HERBORA AI</span><span>AI-Based Ayurvedic Herbal Knowledge and Recommendation System · academic project.</span><span>Data-source attribution: no external dataset source was supplied for these local sample records.</span></div><nav className="footer-nav" aria-label="Footer navigation"><Link href="/herbs">Explore herbs</Link><Link href="/search">Search</Link><Link href="/about">About project</Link><Link href="/evidence-safety">Evidence & safety <ArrowRight size={14}/></Link></nav><p className="footer-disclaimer">Educational use only. Not medical advice.</p></footer>
+      <p className="sidebar-label sidebar-label-spaced">Study & references</p>
+      <nav className="sidebar-nav" aria-label="Study and reference navigation">
+        {studyItems.map(({ href, label, icon: Icon }) => {
+          const active = location === href;
+          return <Link key={href} href={href} onClick={() => setMenuOpen(false)} className={`sidebar-link ${active ? "active" : ""}`} aria-current={active ? "page" : undefined} data-testid={`link-nav-${href.slice(1)}`}><Icon size={18}/><span>{label}</span>{active && <span className="sidebar-active-mark"/>}</Link>;
+        })}
+        <span className="sidebar-link sidebar-link-disabled" aria-label="Identification history, coming soon"><UserRound size={18}/><span>Identification history</span><small>SOON</small></span>
+      </nav>
+      <div className="sidebar-bottom">
+        <div className="sidebar-notice"><ShieldCheck size={17}/><p><strong>Learning reference</strong><br/>Educational use only. Not medical advice.</p></div>
+        <div className="sidebar-caption">HERBORA AI <span>·</span> ACADEMIC PROJECT</div>
+      </div>
+    </aside>
+    <div className="main-layout">
+      <header className="topbar">
+        <button type="button" className="mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-controls="primary-navigation" aria-label={menuOpen ? "Close navigation" : "Open navigation"} data-testid="button-mobile-navigation"><Menu size={21}/></button>
+        <div className="topbar-title"><span>HERBORA AI <i>/</i> FIELD NOTES</span><h1>{activePage}</h1></div>
+        <form className="global-search" role="search" onSubmit={(event) => { event.preventDefault(); if (globalQuery.trim()) setLocation(`/search?q=${encodeURIComponent(globalQuery.trim())}`); }}>
+          <Search size={18}/><input ref={globalSearchRef} value={globalQuery} onChange={(event) => setGlobalQuery(event.target.value)} placeholder="Search herbs and records" aria-label="Search the herb library" data-testid="input-global-search"/><kbd>/</kbd>
+        </form>
+        {user ? <details className="account-menu" ref={accountMenuRef}>
+          <summary aria-label={`Account menu for ${displayName}`} data-testid="button-account-menu">
+            <span className="account-avatar">{user.imageUrl ? <img src={user.imageUrl} alt=""/> : initials}</span><span className="account-menu-name">{displayName}</span><ChevronDown size={15}/>
+          </summary>
+          <div className="account-menu-panel">
+            <div className="account-menu-identity"><strong>{displayName}</strong><span>{user.primaryEmailAddress?.emailAddress}</span></div>
+            <Link href="/profile" data-testid="link-profile"><UserRound size={16}/>My profile</Link>
+            <Link href="/saved-herbs" data-testid="link-saved-herbs"><Bookmark size={16}/>Saved herbs</Link>
+            <Link href="/settings" data-testid="link-settings"><Settings size={16}/>Settings</Link>
+            <span className="account-menu-soon"><BookOpen size={16}/>Identification history <small>Coming soon</small></span>
+            <button type="button" onClick={() => void signOut({ redirectUrl: basePath || "/" })} data-testid="button-sign-out"><LogOut size={16}/>Sign out</button>
+          </div>
+        </details> : <Link href="/sign-in" className="account-signin" data-testid="link-sign-in"><UserRound size={17}/><span>Sign in</span></Link>}
+      </header>
+      <main className="page-wrap">{children}</main>
+      <footer className="footer"><div className="footer-copy"><span className="footer-brand">HERBORA AI</span><span>AI-Based Ayurvedic Herbal Knowledge and Recommendation System · academic project.</span><span>Data-source attribution: no external dataset source was supplied for these local sample records.</span></div><nav className="footer-nav" aria-label="Footer navigation"><Link href="/herbs">Explore herbs</Link><Link href="/search">Search</Link><Link href="/about">About project</Link><Link href="/evidence-safety">Evidence & safety <ArrowRight size={14}/></Link></nav><p className="footer-disclaimer">Educational use only. Not medical advice.</p></footer>
+    </div>
   </div>;
 }
 
@@ -170,8 +247,11 @@ function IdentifyPage() {
   const processFile = (incoming?: File) => {
     setError(""); setResult(false);
     if (!incoming) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(incoming.type)) { setError("Choose a JPG, JPEG, PNG or WEBP image."); return; }
-    if (incoming.size > 10 * 1024 * 1024) { setError("This image is larger than 10 MB. Choose a smaller file."); return; }
+    const extension = incoming.name.toLocaleLowerCase().split(".").pop();
+    const supportedMime = ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(incoming.type);
+    const supportedExtensionWithoutMime = !incoming.type && ["jpg", "jpeg", "png", "webp"].includes(extension || "");
+    if (!supportedMime && !supportedExtensionWithoutMime) { setError("Choose a JPG, JPEG, PNG or WEBP image."); if (inputRef.current) inputRef.current.value = ""; return; }
+    if (incoming.size > 10 * 1024 * 1024) { setError("This image is larger than 10 MB. Choose a smaller file."); if (inputRef.current) inputRef.current.value = ""; return; }
     if (preview) URL.revokeObjectURL(preview);
     setFile(incoming); setPreview(URL.createObjectURL(incoming));
   };
@@ -251,7 +331,7 @@ function SearchPage() {
   const clearRecent = () => { setRecent([]); sessionStorage.removeItem("herbora-recent-searches"); };
   return <><PageMeta title="Intelligent search" description="Local keyword search across available sample herb records."/><PageIntro eyebrow="Local research tool" title="Find knowledge, naturally." description="Search names, botanical names, families, plant parts and categories in the current local records. Search is keyword-based, typo-tolerant and never sent to a server."/>
     <form className="search-page-form" onSubmit={(e) => { e.preventDefault(); void run(); }}><Search size={21}/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ask about a herb, plant part, property, or formulation..." aria-label="Search about a herb, plant part, property, or formulation" data-testid="input-search"/><button type="submit" className="button button-primary" disabled={!query.trim() || loading}>{loading ? "Searching…" : "Search"} <ArrowRight size={15}/></button></form>
-    <div className="search-examples"><span className="micro-label">Try an example</span>{["Tell me about Tulsi", "Explore the botanical profile of Neem", "Show herbs with documented similar properties", "Find formulations associated with a herb"].map((item) => <button type="button" key={item} onClick={() => { setQuery(item); void run(item); }}>{item}</button>)}</div>
+     <div className="search-examples"><span className="micro-label">Try an example</span>{["Ashwagandha", "Ginger", "Licorice", "Amla"].map((item) => <button type="button" key={item} onClick={() => { setQuery(item); void run(item); }}>{item}</button>)}</div>
     <div className="search-columns"><section className="search-results">{submitted ? <><div className="section-heading"><div><p className="eyebrow">Search results</p><h2>{results.length} {results.length === 1 ? "match" : "matches"} for “{submitted}”</h2></div></div>{results.length ? <div className="herb-grid is-list">{results.map((herb) => {
       const terms = submitted.toLocaleLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((term) => term.length > 2 && !["tell","about","explore","the","botanical","profile","show","herbs","with","documented","similar","find","formulations","associated"].includes(term));
       const searchable = [
@@ -295,7 +375,7 @@ function AboutPage() {
   return <><PageMeta title="About project" description="Project scope, workflow, methodology and limitations of the HERBORA AI educational prototype."/><PageIntro eyebrow="Project notes" title="A learning tool in progress." description="HERBORA AI is an AI-Based Ayurvedic Herbal Knowledge and Recommendation System: an academic project exploring a transparent interface for botanical records, image-upload workflows and metadata-based discovery."/>
     <section className="about-lead"><span className="large-quote">“</span><div><p className="eyebrow">Project overview</p><h2>Make the limits as legible<br/>as the knowledge.</h2><p>The problem this project explores is fragmented plant knowledge and the need to keep attributed traditional context distinct from source-linked research. The goal is a study interface, not a clinical authority.</p></div><div className="leaf-engraving" aria-hidden="true"><Sprout size={78}/></div></section>
     <section className="project-detail-grid"><article><span className="method-number">01</span><h3>Objectives</h3><ul><li>Explore image-upload interaction without inventing a prediction.</li><li>Organize the fields present in a small herb dataset.</li><li>Search locally and explain metadata-based relationships.</li><li>Make evidence and safety gaps visible.</li></ul></article><article><span className="method-number">02</span><h3>Proposed image workflow</h3><p>Image input → preprocessing → image classification model → predicted herb → structured knowledge retrieval → metadata-based recommendations → evidence and safety presentation.</p><p className="account-help">The classification model is not connected in this frontend.</p></article><article><span className="method-number">03</span><h3>Search workflow</h3><p>Text query → local query processing → search across available record fields → relevant herb profiles.</p></article></section>
-    <section className="section-block"><div className="section-heading"><div><p className="eyebrow">Prototype status</p><h2>Working now / planned next</h2></div></div><div className="status-columns"><article className="status-card"><span className="status-pill working"><span/>Working in this frontend</span><ul><li>Sample herb library, filters and local fuzzy keyword search</li><li>Herb profiles with empty fields explicitly visible</li><li>Metadata overlap links based on shared family and plant part</li><li>Image preview and validation in the browser</li><li>Session-only recent searches</li></ul></article><article className="status-card planned"><span className="status-pill planned-pill"><span/>Planned integration</span><ul><li>Python image-identification API with a documented model card</li><li>Reviewed, source-linked herb and safety records</li><li>Research references with traceable bibliographic details</li><li>API-backed search and recommendation services</li></ul></article></div></section>
+     <section className="section-block"><div className="section-heading"><div><p className="eyebrow">Prototype status</p><h2>Working now / planned next</h2></div></div><div className="status-columns"><article className="status-card"><span className="status-pill working"><span/>Working in this frontend</span><ul><li>Sample herb library, filters and local fuzzy keyword search</li><li>Herb profiles with empty fields explicitly visible</li><li>Metadata overlap links based on shared family and plant part</li><li>Image preview and validation in the browser</li><li>Real Clerk email/password authentication and profile editing</li><li>Per-account local bookmarks and session-only recent searches</li></ul></article><article className="status-card planned"><span className="status-pill planned-pill"><span/>Planned integration</span><ul><li>Python image-identification API with a documented model card</li><li>Reviewed, source-linked herb and safety records</li><li>Research references with traceable bibliographic details</li><li>API-backed search and recommendation services</li></ul></article></div></section>
     <section className="method-grid"><article><span className="method-number">01</span><h3>Image workflow</h3><p>Files are type-checked and limited to 10 MB. A local preview is created in the browser. The current identify service returns a model-not-connected status; it does not produce a species prediction or confidence score.</p></article><article><span className="method-number">02</span><h3>Text workflow</h3><p>Search runs against the local sample dataset over common and botanical names, family, plant parts and category. Recent terms are stored in session storage only and cleared when the session ends.</p></article><article><span className="method-number">03</span><h3>Recommendation logic</h3><p>Related entries are ranked by the count of shared, explicitly recorded family and plant-part features. No clinical, medicinal, dosha or personal suitability is predicted.</p></article></section>
     <section className="api-notes"><div><p className="eyebrow">For the next implementation</p><h2>API integration contract</h2><p>Local service functions are typed and replaceable in <code>src/lib/herb-service.ts</code>. Keep the UI contract stable when connecting a backend.</p></div><div className="contract"><div><span>POST</span><code>/identify</code><small>multipart image file → PredictionResult or explicit unavailable status</small></div><div><span>GET</span><code>/herbs</code><small>filters → Herb[] with field-level provenance</small></div><div><span>GET</span><code>/search · /recommendations</code><small>query or herb id → documented local matches and overlap reasons</small></div><p>Do not return a confidence score unless it is defined, calibrated, versioned and appropriate to display. No GPS, location tracking or device telemetry is part of the workflow.</p></div></section>
     <section className="project-detail-grid project-detail-secondary"><article><h3>Methodology</h3><p>Image preprocessing and model classification are a proposed future integration. Current local search uses exact and typo-tolerant matching on recorded names, families, plant parts, categories and present text fields. Related records use only shared family and plant-part metadata.</p></article><article><h3>Dataset approach</h3><p>The current sample contains six locally defined herb records. Traditional-use details, constituents, formulations, citations and safety records are empty when none were supplied. No external dataset attribution was supplied with this frontend data.</p></article><article><h3>Future enhancements</h3><p>Connect a documented model endpoint, add reviewed source-linked records, define provenance for dataset updates and evaluate model performance before displaying prediction scores.</p></article></section>
@@ -306,18 +386,127 @@ function AboutPage() {
 function NotFound() { return <><PageMeta title="Page not found" description="The requested HERBORA page could not be found."/><div className="not-found"><span className="eyebrow">404 · off the path</span><h1>This page isn't in<br/><em>the field notes.</em></h1><p>It may have moved, or it may never have been recorded.</p><Link href="/" className="button button-primary"><ArrowLeft size={16}/> Return to overview</Link></div></>; }
 
 function RoutedErrorBoundary({ children }: { children: ReactNode }) { const [location] = useLocation(); return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>; }
-function SignInPage() { return <><PageMeta title="Sign in" description="Sign in to your HERBORA AI learning account."/><section className="auth-page"><div className="auth-story"><div><p className="eyebrow">Welcome back to HERBORA AI</p><h1>Continue exploring botanical knowledge.</h1><p>Sign in to keep a local reading list of herb records on this device. Your search and study remain grounded in the available evidence.</p></div><div className="hero-footnote"><span>FIELD NOTES</span><span className="footnote-rule"/><span>Learning reference · not medical advice</span></div></div><div className="auth-form-wrap"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></div></section></>; }
+function SignInPage() { return <><PageMeta title="Sign in" description="Sign in to your HERBORA AI learning account."/><section className="auth-page"><div className="auth-story"><div><p className="eyebrow">Welcome back to HERBORA AI</p><h1>Continue exploring botanical knowledge.</h1><p>Sign in to keep a local reading list of herb records on this device. Your search and study remain grounded in the available evidence.</p></div><div className="hero-footnote"><span>FIELD NOTES</span><span className="footnote-rule"/><span>Learning reference · not medical advice</span></div></div><div className="auth-form-wrap"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /><Link className="auth-forgot-link" href="/forgot-password">Forgot your password?</Link></div></section></>; }
 function SignUpPage() { return <><PageMeta title="Create account" description="Create a HERBORA AI account with Clerk."/><section className="auth-page"><div className="auth-story"><div><p className="eyebrow">A place for your field notes</p><h1>Create your HERBORA account.</h1><p>Use your account to keep saved herb bookmarks on this device. Authentication is handled by Clerk; HERBORA never stores your password.</p></div><div className="hero-footnote"><span>FIELD NOTES</span><span className="footnote-rule"/><span>Evidence boundaries stay visible</span></div></div><div className="auth-form-wrap"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></div></section></>; }
-function ForgotPasswordAlias() { return <Redirect to="/sign-in/forgot-password"/>; }
 function LoginAlias() { return <Redirect to="/sign-in"/>; }
 function SignupAlias() { return <Redirect to="/sign-up"/>; }
+
+function ForgotPasswordPage() {
+  const { isLoaded, signIn } = useSignIn();
+  const [, setLocation] = useLocation();
+  const [step, setStep] = useState<"email" | "code" | "password" | "done">("email");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const explainError = (reason: unknown) => {
+    setError(reason instanceof Error ? reason.message : "Clerk could not complete this step. Check your details and try again.");
+  };
+
+  const requestCode = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!signIn) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const attempt = await signIn.create({ strategy: "reset_password_email_code", identifier: email.trim() });
+      if (attempt.status === "needs_first_factor") {
+        setStep("code");
+        setNotice("If this account can reset by email, Clerk has sent a verification code.");
+      } else if (attempt.status === "needs_new_password") {
+        setStep("password");
+      } else {
+        setError("This account cannot continue through email-code password reset. Return to sign in and use an available sign-in method.");
+      }
+    } catch (reason) {
+      explainError(reason);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verifyCode = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!signIn) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const attempt = await signIn.attemptFirstFactor({ strategy: "reset_password_email_code", code: code.trim() });
+      if (attempt.status === "needs_new_password") {
+        setStep("password");
+      } else if (attempt.status === "complete") {
+        setError("Clerk completed the recovery step without requesting a new password. Return to sign in and try again.");
+      } else {
+        setError("Clerk needs another verification step before this password can be changed.");
+      }
+    } catch (reason) {
+      explainError(reason);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updatePassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!signIn) return;
+    if (password !== confirmation) {
+      setError("The passwords do not match.");
+      return;
+    }
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await signIn.resetPassword({ password });
+      if (result.status === "complete") {
+        setStep("done");
+        setPassword(""); setConfirmation("");
+        setNotice("Your password was updated by Clerk. Sign in with the new password to continue.");
+      } else {
+        setError("Clerk requires another step before the password can be updated.");
+      }
+    } catch (reason) {
+      explainError(reason);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!isLoaded) return <div className="skeleton-page" aria-label="Loading password reset"><div/><div/><div/></div>;
+  return <><PageMeta title="Reset password" description="Reset a HERBORA AI account password through Clerk's secure email-code flow."/><section className="auth-page">
+    <div className="auth-story"><div><p className="eyebrow">Account access</p><h1>{step === "done" ? "Back to your field notes." : "Reset your password."}</h1><p>Clerk handles this account recovery flow. HERBORA does not store your password or reset code.</p></div><div className="hero-footnote"><span>FIELD NOTES</span><span className="footnote-rule"/><span>Account security managed by Clerk</span></div></div>
+    <div className="auth-form-wrap"><section className="reset-card">
+      <p className="eyebrow">Password recovery</p>
+      <h2>{step === "email" ? "Request a reset code" : step === "code" ? "Check your email" : step === "password" ? "Choose a new password" : "Password reset complete"}</h2>
+      {notice && <p className="account-success" role="status">{notice}</p>}
+      {error && <p className="account-error" role="alert">{error}</p>}
+      {step === "email" && <form className="account-form" onSubmit={(event) => void requestCode(event)}>
+        <label htmlFor="reset-email">Email address</label><input className="account-input" id="reset-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} data-testid="input-reset-email"/>
+        <button type="submit" className="button button-primary" disabled={busy}>{busy ? "Sending…" : "Send reset code"} <ArrowRight size={16}/></button>
+      </form>}
+      {step === "code" && <form className="account-form" onSubmit={(event) => void verifyCode(event)}>
+        <p className="account-help">Enter the code sent to {email}.</p>
+        <label htmlFor="reset-code">Email verification code</label><input className="account-input" id="reset-code" inputMode="numeric" autoComplete="one-time-code" required maxLength={12} value={code} onChange={(event) => setCode(event.target.value)} data-testid="input-reset-code"/>
+        <button type="submit" className="button button-primary" disabled={busy}>{busy ? "Verifying…" : "Verify code"} <ArrowRight size={16}/></button>
+        <button type="button" className="text-link" onClick={() => { setStep("email"); setCode(""); setNotice(""); setError(""); }}>Use another email</button>
+      </form>}
+      {step === "password" && <form className="account-form" onSubmit={(event) => void updatePassword(event)}>
+        <label htmlFor="reset-password">New password</label><input className="account-input" id="reset-password" type="password" autoComplete="new-password" required value={password} onChange={(event) => setPassword(event.target.value)} data-testid="input-new-password"/>
+        <label htmlFor="reset-confirmation">Confirm new password</label><input className="account-input" id="reset-confirmation" type="password" autoComplete="new-password" required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} data-testid="input-confirm-new-password"/>
+        <button type="submit" className="button button-primary" disabled={busy}>{busy ? "Updating…" : "Update password"} <Check size={16}/></button>
+      </form>}
+      {step === "done" && <div className="reset-complete"><Check size={23}/><Link href="/sign-in" className="button button-primary" data-testid="link-reset-sign-in">Return to sign in <ArrowRight size={16}/></Link></div>}
+      {step !== "done" && <Link href="/sign-in" className="reset-back" data-testid="link-reset-back">Back to sign in <ArrowRight size={14}/></Link>}
+    </section></div>
+  </section></>;
+}
 
 function Router() {
   return <RoutedErrorBoundary><Shell><Switch>
     <Route path="/" component={Overview}/><Route path="/identify" component={IdentifyPage}/><Route path="/herbs" component={LibraryPage}/><Route path="/herbs/:id" component={HerbProfilePage}/>
     <Route path="/search" component={SearchPage}/><Route path="/recommendations" component={RecommendationsPage}/><Route path="/evidence-safety" component={EvidencePage}/><Route path="/about" component={AboutPage}/>
     <Route path="/profile" component={AccountProfilePage}/><Route path="/settings" component={SettingsPage}/><Route path="/saved-herbs" component={SavedHerbsPage}/>
-    <Route path="/login" component={LoginAlias}/><Route path="/signup" component={SignupAlias}/><Route path="/forgot-password" component={ForgotPasswordAlias}/>
+    <Route path="/login" component={LoginAlias}/><Route path="/signup" component={SignupAlias}/>
     <Route component={NotFound}/>
   </Switch></Shell></RoutedErrorBoundary>;
 }
@@ -356,6 +545,7 @@ function ClerkProviderWithRoutes() {
     <Switch>
       <Route path="/sign-in/*?" component={SignInPage}/>
       <Route path="/sign-up/*?" component={SignUpPage}/>
+      <Route path="/forgot-password" component={ForgotPasswordPage}/>
       <Route><Router/></Route>
     </Switch>
   </ClerkProvider>;

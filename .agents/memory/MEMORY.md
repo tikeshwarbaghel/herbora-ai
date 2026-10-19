@@ -1,0 +1,1 @@
+- [HERBORA educational scope](herbora-scope.md) — Preserve academic-only use; avoid medical claims and the explicitly excluded tracking features.

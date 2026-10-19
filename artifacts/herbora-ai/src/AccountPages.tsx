@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowRight, BookOpen, Check, ShieldCheck, UserRound } from "lucide-react";
 import { Redirect, Link } from "wouter";
 import { useUser } from "@clerk/react";
@@ -84,11 +84,12 @@ export function SavedHerbsPage() {
 }
 
 type SettingsSection = "Account" | "Appearance" | "Notifications" | "Privacy" | "Data and History";
-const preferenceKey = "herbora-local-preferences";
 type LocalPreferences = { researchUpdates: boolean; productNews: boolean };
-function readPreferences(): LocalPreferences {
+const preferenceKeyFor = (userId: string) => `herbora-local-preferences:${userId}`;
+function readPreferences(userId?: string): LocalPreferences {
+  if (!userId) return { researchUpdates: false, productNews: false };
   try {
-    const value = JSON.parse(localStorage.getItem(preferenceKey) || "{}");
+    const value = JSON.parse(localStorage.getItem(preferenceKeyFor(userId)) || "{}");
     return { researchUpdates: Boolean(value.researchUpdates), productNews: Boolean(value.productNews) };
   } catch { return { researchUpdates: false, productNews: false }; }
 }
@@ -97,15 +98,20 @@ export function SettingsPage() {
   const { user, isLoaded } = useUser();
   const { clear } = useSavedHerbs(user?.id);
   const [section, setSection] = useState<SettingsSection>("Account");
-  const [preferences, setPreferences] = useState<LocalPreferences>(readPreferences);
+  const [preferences, setPreferences] = useState<LocalPreferences>({ researchUpdates: false, productNews: false });
   const [message, setMessage] = useState("");
+  useEffect(() => setPreferences(readPreferences(user?.id)), [user?.id]);
   if (!isLoaded) return <div className="skeleton-page" aria-label="Loading settings"><div/><div/><div/></div>;
   if (!user) return <SignedInRequired />;
   const updatePreferences = (key: keyof LocalPreferences, value: boolean) => {
     const next = { ...preferences, [key]: value };
-    setPreferences(next);
-    localStorage.setItem(preferenceKey, JSON.stringify(next));
-    setMessage("Preference saved on this device.");
+    try {
+      localStorage.setItem(preferenceKeyFor(user.id), JSON.stringify(next));
+      setPreferences(next);
+      setMessage("Preference saved on this device.");
+    } catch {
+      setMessage("Browser storage is unavailable, so this preference could not be saved.");
+    }
   };
   const sections: SettingsSection[] = ["Account", "Appearance", "Notifications", "Privacy", "Data and History"];
   return <AccountFrame title="Settings" intro="A clear view of what your account and this browser actually support. Local preferences stay on this device.">

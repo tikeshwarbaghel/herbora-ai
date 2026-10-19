@@ -19,9 +19,9 @@ export type Herb = {
 
 export const herbs: Herb[] = [
   {
-    id: "tulsi", commonName: "Holy basil", botanicalName: "Ocimum tenuiflorum",
+    id: "tulsi", commonName: "Tulsi", botanicalName: "Ocimum tenuiflorum",
     family: "Lamiaceae", plantParts: ["Leaves", "Aerial parts"], studyCategory: "Aromatic leaf",
-    overview: "An aromatic, branching herb in the mint family. Also known as tulsi or sacred basil.",
+    overview: "An aromatic, branching herb in the mint family, also known as holy or sacred basil.",
     traditionalUses: [],
     properties: [], constituents: [], formulations: [], references: [], safetyRecordIds: []
   },
