@@ -85,7 +85,20 @@ export async function getSafetyInformation(herbId?: string): Promise<SafetyRecor
   return safetyRecords.filter((record) => allowed.has(record.id));
 }
 
-export async function identifyHerb(_imageFile: File): Promise<{ status: "model-not-connected" }> {
-  // Replace this local contract with POST /identify multipart/form-data when the Python API exists.
-  return { status: "model-not-connected" };
+export type IdentifyResponse = {
+  predicted_plant: string;
+  confidence_percent: number;
+  low_confidence: boolean;
+  top3: Array<{ label: string; confidence: number }>;
+  herbal_information: Record<string, string>;
+};
+
+export async function identifyHerb(imageFile: File): Promise<IdentifyResponse> {
+  const response = await fetch("/api/identify", {
+    method: "POST",
+    headers: { "Content-Type": imageFile.type || "image/jpeg" },
+    body: imageFile,
+  });
+  if (!response.ok) throw new Error(`Identify request failed (${response.status})`);
+  return response.json();
 }

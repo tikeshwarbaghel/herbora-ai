@@ -1,3 +1,4 @@
+import type { IdentifyResponse } from "@/lib/herb-service";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -7,7 +8,6 @@ import { ArrowDownWideNarrow, ArrowLeft, ArrowRight, Bookmark, BookOpen, Check, 
 import { Link, Redirect, Route, Switch, Router as WouterRouter, useLocation, useParams } from "wouter";
 import { ClerkProvider, SignIn, SignUp, useClerk, useUser } from "@clerk/react";
 import { useSignIn } from "@clerk/react/legacy";
-import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
 import { herbs, type Herb } from "@/lib/herb-data";
 import { getEvidence, getHerbById, getHerbs, getRecommendations, getSafetyInformation, identifyHerb, searchHerbs } from "@/lib/herb-service";
@@ -17,8 +17,10 @@ import { HerbVisual } from "@/components/herb-visual";
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
-const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+// On localhost, skip Replit's host-based key derivation and use env var directly.
+// proxyUrl is only set when explicitly provided (production/Replit), not on localhost.
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL as string | undefined;
 function stripBase(path: string): string { return basePath && path.startsWith(basePath) ? path.slice(basePath.length) || "/" : path; }
 if (!clerkPubKey) throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY in .env file");
 const clerkAppearance = {
@@ -242,10 +244,10 @@ function IdentifyPage() {
   const [preview, setPreview] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(false);
+  const [result, setResult] = useState<IdentifyResponse | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const processFile = (incoming?: File) => {
-    setError(""); setResult(false);
+    setError(""); setResult(null);
     if (!incoming) return;
     const extension = incoming.name.toLocaleLowerCase().split(".").pop();
     const supportedMime = ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(incoming.type);
@@ -256,25 +258,38 @@ function IdentifyPage() {
     setFile(incoming); setPreview(URL.createObjectURL(incoming));
   };
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
-  const remove = () => { setFile(null); setResult(false); setError(""); if (preview) URL.revokeObjectURL(preview); setPreview(""); if (inputRef.current) inputRef.current.value = ""; };
+  const remove = () => { setFile(null); setResult(null); setError(""); if (preview) URL.revokeObjectURL(preview); setPreview(""); if (inputRef.current) inputRef.current.value = ""; };
   const analyze = async () => {
     if (!file) return;
     setLoading(true); setError("");
-    try { const response = await identifyHerb(file); setResult(response.status === "model-not-connected"); }
-    catch { setError("The demo service could not process this file. Try again."); }
+    try { const response = await identifyHerb(file); setResult(response); }
+    catch { setError("Could not identify this image. Check that the ML service and API server are running."); }
     finally { setLoading(false); }
   };
-  return <><PageMeta title="Identify a medicinal herb" description="Upload and preview a plant image in the browser. Real image identification is not connected."/><PageIntro eyebrow="Image study · demo mode" title="Identify a medicinal herb." description="Upload a clear leaf or plant image to explore a possible match. This prototype has no trained model connected, so it cannot identify the plant or generate a confidence score."/>
+  return <><PageMeta title="Identify a medicinal herb" description="Upload a plant image and get a possible match from the trained model, with a confidence score."/><PageIntro eyebrow="Image study · AI model" title="Identify a medicinal herb." description="Upload a clear leaf or plant image to explore a possible match. A trained image model suggests the most likely matches with a confidence score. Treat every result as a suggestion, not proof."/>
     <div className="identify-layout"><section className="upload-panel">
       <div className="panel-topline"><span className="eyebrow">01 / Upload</span><span className="file-limit">JPG · PNG · WEBP <i/> UP TO 10 MB</span></div>
       {!file ? <div className="drop-zone" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); processFile(e.dataTransfer.files[0]); }} aria-label="Drop an image here">
         <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" hidden onChange={(e) => processFile(e.target.files?.[0])} data-testid="input-plant-image"/>
-        <div className="upload-icon"><Upload size={24}/></div><h2>Drop a plant image here</h2><p>or choose a file from your device</p><button type="button" className="button button-outline" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>Browse files</button><small>For this demo, the image stays in your browser.</small>
+        <div className="upload-icon"><Upload size={24}/></div><h2>Drop a plant image here</h2><p>or choose a file from your device</p><button type="button" className="button button-outline" onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>Browse files</button><small>The image is sent only to your own API server for identification.</small>
       </div> : <div className="preview-box"><img src={preview} alt={`Preview of ${file.name}`}/><div className="preview-caption"><span><b>{file.name}</b><small>{(file.size / 1024 / 1024).toFixed(2)} MB · ready to review</small></span><button className="icon-button" type="button" onClick={remove} aria-label="Remove image"><X size={18}/></button></div></div>}
       {error && <p className="form-error" role="alert"><CircleAlert size={16}/>{error}</p>}
-       {file && <div className="upload-actions"><button type="button" className="text-link" onClick={() => inputRef.current?.click()}>Replace image</button><button type="button" className="button button-primary" disabled={loading} onClick={analyze}>{loading ? <><LoaderCircle className="spin" size={16}/> Preparing demo status…</> : <>Analyze image <ArrowRight size={16}/></>}</button></div>}
-      {result && <div className="demo-result" role="status"><span className="result-stamp"><Info size={18}/></span><div><strong>Demo result — model not connected</strong><p>No identification or confidence score has been generated. Connect a trained model API to enable this step.</p><button type="button" className="text-link" onClick={remove}>Analyze another image <ArrowRight size={14}/></button></div></div>}
-      </section><aside className="identify-aside"><div className="aside-mark"><Leaf size={23}/></div><p className="eyebrow">Before you begin</p><h2>A photograph is a starting point, not proof.</h2><p>Reliable plant identification can depend on leaves, flowers, fruit, habitat and season. Never rely on an image match to decide whether a plant is safe to use.</p><div className="fine-rule"/><p className="eyebrow">Image tips</p><ul className="clean-list"><li>Use a clear, focused leaf image.</li><li>Prefer natural lighting.</li><li>Avoid heavily blurred images.</li><li>Include one prominent leaf when possible.</li></ul><div className="fine-rule"/><p className="small-note">Nothing is uploaded to a server in this demo. The future integration should send only the chosen file to a dedicated identification endpoint, with consent and retention rules made clear.</p><Link href="/about" className="under-link">Read the API notes <ArrowRight size={14}/></Link></aside></div>
+       {file && <div className="upload-actions"><button type="button" className="text-link" onClick={() => inputRef.current?.click()}>Replace image</button><button type="button" className="button button-primary" disabled={loading} onClick={analyze}>{loading ? <><LoaderCircle className="spin" size={16}/> Analyzing image…</> : <>Analyze image <ArrowRight size={16}/></>}</button></div>}
+      {result && (
+        <div className="demo-result" role="status">
+          <span className="result-stamp"><Info size={18}/></span>
+          <div>
+            <strong>{result.predicted_plant.replace(/_/g, " ")} - {result.confidence_percent.toFixed(1)}% confidence</strong>
+            {result.low_confidence && <p><b>Low confidence.</b> This match is uncertain. Please verify the plant before relying on it.</p>}
+            <p>Other possible matches: {result.top3.slice(1).map((t) => `${t.label.replace(/_/g, " ")} (${t.confidence.toFixed(1)}%)`).join(", ")}</p>
+            {!result.low_confidence && result.herbal_information.scientific_name && <p><b>Scientific name:</b> {result.herbal_information.scientific_name}</p>}
+            {!result.low_confidence && result.herbal_information.traditional_uses && <p><b>Traditional use:</b> {result.herbal_information.traditional_uses}</p>}
+            {!result.low_confidence && result.herbal_information.safety_notes && <p><b>Safety:</b> {result.herbal_information.safety_notes}</p>}
+            <button type="button" className="text-link" onClick={remove}>Analyze another image <ArrowRight size={14}/></button>
+          </div>
+        </div>
+      )}
+      </section><aside className="identify-aside"><div className="aside-mark"><Leaf size={23}/></div><p className="eyebrow">Before you begin</p><h2>A photograph is a starting point, not proof.</h2><p>Reliable plant identification can depend on leaves, flowers, fruit, habitat and season. Never rely on an image match to decide whether a plant is safe to use.</p><div className="fine-rule"/><p className="eyebrow">Image tips</p><ul className="clean-list"><li>Use a clear, focused leaf image.</li><li>Prefer natural lighting.</li><li>Avoid heavily blurred images.</li><li>Include one prominent leaf when possible.</li></ul><div className="fine-rule"/><p className="small-note">The chosen image is sent to the identification endpoint of this app and is not stored. Results come from a model with limited accuracy, so always verify before using any plant.</p><Link href="/about" className="under-link">Read the API notes <ArrowRight size={14}/></Link></aside></div>
   </>;
 }
 
