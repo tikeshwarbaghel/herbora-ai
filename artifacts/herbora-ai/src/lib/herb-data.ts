@@ -1,3 +1,5 @@
+import generated from "./herbs.generated";
+
 export type HerbProperty = { name: string; description?: string };
 export type Constituent = { name: string; note?: string };
 export type Formulation = { name: string; note?: string };
@@ -10,57 +12,25 @@ export type SafetyRecord = {
   interactions: string[]; sourceUrl?: string; accessedAt?: string;
 };
 export type Herb = {
-  id: string; commonName: string; botanicalName: string; family?: string;
-  plantParts: string[]; imageUrl?: string; overview?: string;
+  id: string; classLabel?: string; commonName: string; botanicalName: string; family?: string;
+  plantParts: string[]; imageUrl?: string; imageCredit?: string; overview?: string; overviewSource?: string;
   traditionalUses: string[]; properties: HerbProperty[]; constituents: Constituent[];
   formulations: Formulation[]; references: EvidenceReference[]; safetyRecordIds: string[];
-  studyCategory?: string;
+  studyCategory?: string; verificationStatus?: string;
+  localNames?: Array<{ language: string; names: string[] }>;
 };
 
-export const herbs: Herb[] = [
-  {
-    id: "tulsi", commonName: "Tulsi", botanicalName: "Ocimum tenuiflorum",
-    family: "Lamiaceae", plantParts: ["Leaves", "Aerial parts"], studyCategory: "Aromatic leaf",
-    overview: "An aromatic, branching herb in the mint family, also known as holy or sacred basil.",
-    traditionalUses: [],
-    properties: [], constituents: [], formulations: [], references: [], safetyRecordIds: []
-  },
-  {
-    id: "ashwagandha", commonName: "Ashwagandha", botanicalName: "Withania somnifera",
-    family: "Solanaceae", plantParts: ["Root", "Leaves"], studyCategory: "Root & shrub",
-    overview: "A perennial shrub of the nightshade family, native to parts of South Asia and North Africa.",
-    traditionalUses: [],
-    properties: [], constituents: [], formulations: [], references: [], safetyRecordIds: []
-  },
-  {
-    id: "turmeric", commonName: "Turmeric", botanicalName: "Curcuma longa",
-    family: "Zingiberaceae", plantParts: ["Rhizome"], studyCategory: "Rhizome",
-    overview: "A perennial plant in the ginger family; its underground rhizome is used as a culinary spice.",
-    traditionalUses: [],
-    properties: [], constituents: [], formulations: [], references: [], safetyRecordIds: []
-  },
-  {
-    id: "ginger", commonName: "Ginger", botanicalName: "Zingiber officinale",
-    family: "Zingiberaceae", plantParts: ["Rhizome"], studyCategory: "Rhizome",
-    overview: "A flowering plant in the ginger family, cultivated for its aromatic underground rhizome.",
-    traditionalUses: [],
-    properties: [], constituents: [], formulations: [], references: [], safetyRecordIds: []
-  },
-  {
-    id: "licorice", commonName: "Licorice", botanicalName: "Glycyrrhiza glabra",
-    family: "Fabaceae", plantParts: ["Root"], studyCategory: "Root",
-    overview: "A perennial legume whose root has a long history of use in food and traditional systems.",
-    traditionalUses: [],
-    properties: [], constituents: [], formulations: [], references: [], safetyRecordIds: []
-  },
-  {
-    id: "amla", commonName: "Amla", botanicalName: "Phyllanthus emblica",
-    family: "Phyllanthaceae", plantParts: ["Fruit"], studyCategory: "Fruit",
-    overview: "A deciduous tree native to tropical and subtropical Asia, bearing pale green-yellow fruit.",
-    traditionalUses: [],
-    properties: [], constituents: [], formulations: [], references: [], safetyRecordIds: []
-  }
-];
+// "Hindi: Tulsi · Kannada: Tulasi" jaisa chhota text
+export function localNamesText(herb: Herb, max = 3): string {
+  return (herb.localNames ?? []).slice(0, max).map((l) => `${l.language}: ${l.names.join(" / ")}`).join(" · ");
+}
+
+// Data herbs.generated.ts se aata hai (scripts/build_herbs.py, ml-service/herbs.csv se banta hai)
+export const herbs: Herb[] = (generated.herbs as unknown as Herb[]).map((h) => ({
+  ...h,
+  imageUrl: h.imageUrl ? `${import.meta.env.BASE_URL}${h.imageUrl}` : undefined,
+}));
+export const safetyRecords: SafetyRecord[] = generated.safetyRecords as unknown as SafetyRecord[];
 
 export type HerbFilters = { query?: string; family?: string; part?: string; category?: string; sort?: "name" | "botanical" };
 export type RecommendationResult = { herbId: string; sharedFeatures: string[]; score?: number };

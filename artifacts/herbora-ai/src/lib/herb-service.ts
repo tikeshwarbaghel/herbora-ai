@@ -1,6 +1,4 @@
-import { herbs, type EvidenceReference, type Herb, type HerbFilters, type RecommendationResult, type SafetyRecord } from "./herb-data";
-
-const safetyRecords: SafetyRecord[] = [];
+import { herbs, safetyRecords, type EvidenceReference, type Herb, type HerbFilters, type RecommendationResult, type SafetyRecord } from "./herb-data";
 
 function normalize(value: string) {
   return value.toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -12,7 +10,7 @@ function searchScore(h: Herb, query: string) {
   if (!q) return 0;
   const fields = [
     h.commonName, h.botanicalName, h.family ?? "", ...h.plantParts, h.studyCategory ?? "",
-    h.overview ?? "", ...h.traditionalUses,
+    h.overview ?? "", ...h.traditionalUses, ...(h.localNames ?? []).flatMap((l) => l.names),
     ...h.properties.flatMap((item) => [item.name, item.description ?? ""]),
     ...h.constituents.flatMap((item) => [item.name, item.note ?? ""]),
     ...h.formulations.flatMap((item) => [item.name, item.note ?? ""]),
